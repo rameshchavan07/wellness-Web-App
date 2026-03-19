@@ -1,0 +1,26 @@
+# Core
+streamlit
+python-dotenv
+
+# Firebase
+firebase-admin
+
+# Google Fit
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+
+# AI / ML
+openai
+scikit-learn
+numpy
+pandas
+
+# Visualization
+plotly
+
+# Utils
+requests
+Pillow
+streamlit-option-menu
