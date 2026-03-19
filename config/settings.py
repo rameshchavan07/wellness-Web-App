@@ -4,28 +4,44 @@ Central configuration module for all app settings.
 """
 
 import os
+import streamlit as st
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
+def get_secret(key: str, default: str = "") -> str:
+    """Retrieve secret from env var, then st.secrets (root), then st.secrets['firebase']."""
+    val = os.getenv(key)
+    if val:
+        return val
+    try:
+        if key in st.secrets:
+            return st.secrets[key]
+        if "firebase" in st.secrets and key in st.secrets["firebase"]:
+            return st.secrets["firebase"][key]
+    except Exception:
+        pass
+    return default
+
+
 class AppConfig:
     """Application-wide configuration."""
-    APP_NAME = os.getenv("APP_NAME", "DayScore")
-    APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
-    DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+    APP_NAME = get_secret("APP_NAME", "DayScore")
+    APP_VERSION = get_secret("APP_VERSION", "1.0.0")
+    DEBUG = get_secret("DEBUG", "False").lower() == "true"
 
 
 class FirebaseConfig:
     """Firebase connection configuration."""
-    API_KEY = os.getenv("FIREBASE_API_KEY", "")
-    AUTH_DOMAIN = os.getenv("FIREBASE_AUTH_DOMAIN", "")
-    PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
-    STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET", "")
-    MESSAGING_SENDER_ID = os.getenv("FIREBASE_MESSAGING_SENDER_ID", "")
-    APP_ID = os.getenv("FIREBASE_APP_ID", "")
-    DATABASE_URL = os.getenv("FIREBASE_DATABASE_URL", "")
-    SERVICE_ACCOUNT_PATH = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "config/serviceAccountKey.json")
+    API_KEY = get_secret("FIREBASE_API_KEY", "")
+    AUTH_DOMAIN = get_secret("FIREBASE_AUTH_DOMAIN", "")
+    PROJECT_ID = get_secret("FIREBASE_PROJECT_ID", "")
+    STORAGE_BUCKET = get_secret("FIREBASE_STORAGE_BUCKET", "")
+    MESSAGING_SENDER_ID = get_secret("FIREBASE_MESSAGING_SENDER_ID", "")
+    APP_ID = get_secret("FIREBASE_APP_ID", "")
+    DATABASE_URL = get_secret("FIREBASE_DATABASE_URL", "")
+    SERVICE_ACCOUNT_PATH = get_secret("FIREBASE_SERVICE_ACCOUNT_PATH", "config/serviceAccountKey.json")
 
     @classmethod
     def to_pyrebase_config(cls):
@@ -42,9 +58,9 @@ class FirebaseConfig:
 
 class GoogleFitConfig:
     """Google Fit API configuration."""
-    CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
-    CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-    REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8501")
+    CLIENT_ID = get_secret("GOOGLE_CLIENT_ID", "")
+    CLIENT_SECRET = get_secret("GOOGLE_CLIENT_SECRET", "")
+    REDIRECT_URI = get_secret("GOOGLE_REDIRECT_URI", "http://localhost:8501")
     SCOPES = [
         "https://www.googleapis.com/auth/fitness.activity.read",
         "https://www.googleapis.com/auth/fitness.body.read",
@@ -55,7 +71,7 @@ class GoogleFitConfig:
 
 class OpenAIConfig:
     """OpenAI API configuration."""
-    API_KEY = os.getenv("OPENAI_API_KEY", "")
+    API_KEY = get_secret("OPENAI_API_KEY", "")
     MODEL = "gpt-3.5-turbo"
     MAX_TOKENS = 500
     TEMPERATURE = 0.7
