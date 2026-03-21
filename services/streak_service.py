@@ -44,6 +44,9 @@ class StreakService:
                         "last_active_date": today,
                     })
                     return streak
+                else:
+                    # New user or demo user without Firestore doc
+                    return self._demo_update_streak(today)
             else:
                 # Demo mode
                 return self._demo_update_streak(today)
@@ -84,6 +87,8 @@ class StreakService:
 
                     user_ref.update({"sleep_streak": sleep_streak})
                     return sleep_streak
+                else:
+                    return self._demo_sleep_streak(good_sleep)
             else:
                 return self._demo_sleep_streak(good_sleep)
         except Exception:

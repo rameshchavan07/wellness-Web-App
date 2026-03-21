@@ -80,12 +80,12 @@ class NotificationService:
 
     @staticmethod
     def display_notifications(notifications: list):
-        """Render notifications in the Streamlit sidebar."""
+        """Render notifications in the main content area (not sidebar)."""
         if not notifications:
             return
 
-        with st.sidebar:
-            st.markdown("### 🔔 Notifications")
+        # Show as a compact expandable section in the main area
+        with st.expander("🔔 Notifications", expanded=False):
             for notif in notifications[:5]:  # Show max 5
                 severity = notif.get("severity", "info")
                 if severity == "warning":

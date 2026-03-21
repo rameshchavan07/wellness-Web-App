@@ -5,6 +5,7 @@ Connects to Google Fit API to fetch fitness data.
 
 import streamlit as st
 from datetime import datetime, timedelta
+import requests
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
@@ -22,60 +23,55 @@ class GoogleFitService:
         self.client_secret = GoogleFitConfig.CLIENT_SECRET
         self.redirect_uri = GoogleFitConfig.REDIRECT_URI
 
-    def get_auth_url(self) -> str:
-        """Generate the OAuth 2.0 authorization URL."""
-        try:
-            flow = Flow.from_client_config(
-                {
-                    "web": {
-                        "client_id": self.client_id,
-                        "client_secret": self.client_secret,
-                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                        "token_uri": "https://oauth2.googleapis.com/token",
-                        "redirect_uris": [self.redirect_uri],
-                    }
-                },
-                scopes=self.SCOPES,
-            )
-            flow.redirect_uri = self.redirect_uri
-            auth_url, _ = flow.authorization_url(
-                access_type="offline",
-                include_granted_scopes="true",
-                prompt="consent",
-            )
-            return auth_url
-        except Exception as e:
-            st.error(f"Failed to generate auth URL: {e}")
+    def get_auth_url(self, user_id: str) -> str:
+        """Build Google OAuth2 URL manually — no Flow, no PKCE params added."""
+        from urllib.parse import urlencode
+        if not self.client_id:
             return ""
+        params = {
+            "client_id": self.client_id,
+            "redirect_uri": self.redirect_uri,
+            "response_type": "code",
+            "scope": " ".join(self.SCOPES),
+            "access_type": "offline",
+            "prompt": "consent",
+            "state": f"gfit__{user_id}",
+        }
+        return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
 
     def exchange_code(self, code: str) -> dict:
-        """Exchange authorization code for access token."""
+        """Exchange authorization code for tokens using a direct HTTP POST.
+        Bypasses google-auth-oauthlib's PKCE requirement which breaks
+        when the Flow object is recreated after a page redirect.
+        """
         try:
-            flow = Flow.from_client_config(
-                {
-                    "web": {
-                        "client_id": self.client_id,
-                        "client_secret": self.client_secret,
-                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                        "token_uri": "https://oauth2.googleapis.com/token",
-                        "redirect_uris": [self.redirect_uri],
-                    }
+            resp = requests.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": self.client_id,
+                    "client_secret": self.client_secret,
+                    "redirect_uri": self.redirect_uri,
+                    "grant_type": "authorization_code",
                 },
-                scopes=self.SCOPES,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=15,
             )
-            flow.redirect_uri = self.redirect_uri
-            flow.fetch_token(code=code)
-            creds = flow.credentials
+            if resp.status_code != 200:
+                st.error(f"Token exchange failed: {resp.json().get('error_description', resp.text)}")
+                return {}
+            
+            token_data = resp.json()
             return {
-                "token": creds.token,
-                "refresh_token": creds.refresh_token,
-                "token_uri": creds.token_uri,
-                "client_id": creds.client_id,
-                "client_secret": creds.client_secret,
-                "scopes": list(creds.scopes or []),
+                "token": token_data.get("access_token"),
+                "refresh_token": token_data.get("refresh_token"),
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "scopes": token_data.get("scope", "").split(),
             }
         except Exception as e:
-            st.error(f"Token exchange failed: {e}")
+            st.error(f"Token exchange error: {e}")
             return {}
 
     def _get_service(self, credentials_dict: dict):

@@ -14,9 +14,7 @@ def render_challenges():
     user_name = user.get("name", "Demo User")
 
     st.markdown("""
-    <h1 style="font-size:32px; font-weight:800;
-        background: linear-gradient(90deg, #FF6B6B, #FFD93D);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+    <h1 style="font-size:32px; font-weight:800; color:#FF6B6B;">
         👥 Community Challenges
     </h1>
     <p style="color:rgba(255,255,255,0.5); margin-bottom:24px;">

@@ -142,6 +142,12 @@ def inject_custom_css():
         transform: translateY(-1px);
         box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
     }
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(90deg, rgba(108, 99, 255, 0.6), rgba(78, 205, 196, 0.4)) !important;
+        color: white !important;
+        border: 1px solid rgba(108, 99, 255, 0.8) !important;
+    }
+
 
     /* ── Progress bar custom ───────────────────────────── */
     .custom-progress {
@@ -179,7 +185,7 @@ def inject_custom_css():
     /* ── Hide Streamlit defaults ───────────────────────── */
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
-    header { visibility: hidden; }
+    header { background: transparent !important; }
     </style>
     """, unsafe_allow_html=True)
 

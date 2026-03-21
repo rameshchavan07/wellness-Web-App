@@ -5,12 +5,12 @@ Built with Streamlit + Firebase + Google Fit.
 """
 #streamlit run app.py
 import streamlit as st
-from streamlit_option_menu import option_menu
 
 from config.settings import AppConfig
 from auth.auth_service import AuthService
 from auth.google_oauth import get_google_auth_url, handle_google_callback
 from utils.ui_components import inject_custom_css
+from services.google_fit_service import GoogleFitService
 
 # ── Page Configuration ─────────────────────────────────
 st.set_page_config(
@@ -22,7 +22,6 @@ st.set_page_config(
 
 # Inject custom CSS
 inject_custom_css()
-
 
 # ── Authentication Gate ────────────────────────────────
 def render_login_page():
@@ -183,55 +182,31 @@ def render_main_app():
         </div>
         """, unsafe_allow_html=True)
 
-        # Navigation
-        selected = option_menu(
-            menu_title=None,
-            options=[
-                "Dashboard",
-                "Results",
-                "Achievements",
-                "Challenges",
-                "Wellness",
-                "AI Coach",
-                "Settings",
-            ],
-            icons=[
-                "speedometer2",
-                "graph-up",
-                "trophy",
-                "people",
-                "heart-pulse",
-                "robot",
-                "gear",
-            ],
-            default_index=0,
-            styles={
-                "container": {
-                    "padding": "0",
-                    "background-color": "transparent",
-                },
-                "icon": {
-                    "color": "#6C63FF",
-                    "font-size": "16px",
-                },
-                "nav-link": {
-                    "font-size": "14px",
-                    "text-align": "left",
-                    "padding": "10px 16px",
-                    "border-radius": "10px",
-                    "color": "rgba(255,255,255,0.7)",
-                    "margin": "2px 0",
-                    "--hover-color": "rgba(108,99,255,0.1)",
-                },
-                "nav-link-selected": {
-                    "background": "linear-gradient(90deg, rgba(108,99,255,0.3), rgba(78,205,196,0.1))",
-                    "color": "white",
-                    "font-weight": "600",
-                },
-            },
-        )
+        # Navigation — reliable st.button approach
+        st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
 
-        # Sidebar footer
+        NAV_PAGES = [
+            ("Dashboard",    "📊"),
+            ("Results",      "📈"),
+            ("Achievements", "🏆"),
+            ("Challenges",   "👥"),
+            ("Wellness",     "🧘"),
+            ("Settings",     "⚙️"),
+        ]
+
+        if "selected_page" not in st.session_state:
+            st.session_state.selected_page = "Dashboard"
+
+        for page_name, icon in NAV_PAGES:
+            is_active = st.session_state.selected_page == page_name
+            btn_type = "primary" if is_active else "secondary"
+            
+            if st.button(f"{icon}  {page_name}", key=f"nav_{page_name}", use_container_width=True, type=btn_type):
+                st.session_state.selected_page = page_name
+                st.rerun()
+
+        selected = st.session_state.selected_page
+
         st.markdown("---")
         if st.button("🚪 Sign Out", use_container_width=True):
             auth_service.sign_out()
@@ -247,32 +222,81 @@ def render_main_app():
         </div>
         """, unsafe_allow_html=True)
 
-    # ── Page Router ────────────────────────────────────
-    if selected == "Dashboard":
-        from features.dashboard import render_dashboard
-        render_dashboard()
-    elif selected == "Results":
-        from features.results import render_results
-        render_results()
-    elif selected == "Achievements":
-        from features.achievements import render_achievements
-        render_achievements()
-    elif selected == "Challenges":
-        from features.challenges import render_challenges
-        render_challenges()
-    elif selected == "Wellness":
-        from features.wellness import render_wellness
-        render_wellness()
-    elif selected == "AI Coach":
-        from features.chatbot import render_chatbot
-        render_chatbot()
-    elif selected == "Settings":
-        from features.settings import render_settings
-        render_settings()
+        # Chat toggle button removed from sidebar; it's now a global floating avatar
 
+    # ── Page Router ────────────────────────────────────
+    try:
+        if selected == "Dashboard":
+            from features.dashboard import render_dashboard
+            render_dashboard()
+        elif selected == "Results":
+            from features.results import render_results
+            render_results()
+        elif selected == "Achievements":
+            from features.achievements import render_achievements
+            render_achievements()
+        elif selected == "Challenges":
+            from features.challenges import render_challenges
+            render_challenges()
+        elif selected == "Wellness":
+            from features.wellness import render_wellness
+            render_wellness()
+        elif selected == "Settings":
+            from features.settings import render_settings
+            render_settings()
+    except Exception as page_err:
+        import traceback
+        st.error(f"🚨 Page error: {page_err}")
+        st.code(traceback.format_exc())
+
+    # ── Global Floating Chat ───────────────────────────
+    try:
+        from features.chat.chat_ui import render_floating_chat
+        render_floating_chat()
+    except Exception as e:
+        import traceback
+        print("[DayBot ERROR]", traceback.format_exc())
+
+
+# ── Global Callback Handlers ───────────────────────────
+def process_google_fit_callback():
+    """Restores session and processes Google Fit connection after OAuth redirect."""
+    query_params = st.query_params
+    state = query_params.get("state", "")
+    code = query_params.get("code")
+
+    if state.startswith("gfit__") and code:
+        user_id = state.replace("gfit__", "")
+        
+        with st.spinner("Restoring session and linking Google Fit..."):
+            fit_service = GoogleFitService()
+            creds = fit_service.exchange_code(code)
+            
+            if creds:
+                # We lost session on redirect, so manually restore the user!
+                auth_service = AuthService()
+                if user_id.startswith("demo_"):
+                    user_profile = {"user_id": user_id, "name": "Demo User"}
+                else:
+                    user_profile = auth_service.get_user_profile(user_id)
+                
+                if user_profile:
+                    st.session_state["authenticated"] = True
+                    st.session_state["user"] = user_profile
+                    st.session_state["google_fit_credentials"] = creds
+                    st.session_state["google_fit_connected"] = True
+                    st.success("✅ Google Fit connected successfully! Session restored.")
+                else:
+                    st.error("Could not restore user profile. Please log in again.")
+            
+            # Clear params so it doesn't trigger again
+            st.query_params.clear()
+            st.rerun()
 
 # ── Entry Point ────────────────────────────────────────
 def main():
+    process_google_fit_callback()
+    
     if st.session_state.get("authenticated"):
         render_main_app()
     else:

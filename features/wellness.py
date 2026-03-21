@@ -11,9 +11,7 @@ import random
 def render_wellness():
     """Render the Wellness page."""
     st.markdown("""
-    <h1 style="font-size:32px; font-weight:800;
-        background: linear-gradient(90deg, #4ECDC4, #45B7AA);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+    <h1 style="font-size:32px; font-weight:800; color:#4ECDC4;">
         🧘 Wellness Center
     </h1>
     <p style="color:rgba(255,255,255,0.5); margin-bottom:24px;">
@@ -362,31 +360,37 @@ def _render_sounds():
             "description": "Gentle rainfall to calm your mind",
             "frequency": "Natural",
             "color": "#4ECDC4",
+            "url": "https://www.youtube.com/watch?v=q76bMs-NwRk"
         },
         "🌲 Forest": {
             "description": "Birds chirping and wind through trees",
             "frequency": "Natural",
             "color": "#45B7AA",
+            "url": "https://www.youtube.com/watch?v=xNN7iTA57jM"
         },
         "📻 White Noise": {
             "description": "Steady white noise for focus",
             "frequency": "All frequencies",
             "color": "#6C63FF",
+            "url": "https://www.youtube.com/watch?v=nMfPqeZjc2c"
         },
         "🎵 432Hz Tone": {
             "description": "The 'healing frequency' for deep relaxation",
             "frequency": "432 Hz",
             "color": "#FFD93D",
+            "url": "https://www.youtube.com/watch?v=1ZYbU82GVz4"
         },
         "🎶 528Hz Tone": {
             "description": "The 'love frequency' for stress reduction",
             "frequency": "528 Hz",
             "color": "#FF6B6B",
+            "url": "https://www.youtube.com/watch?v=hkmMWGE8o50"
         },
         "🌊 Ocean Waves": {
             "description": "Rhythmic waves gently crashing on shore",
             "frequency": "Natural",
             "color": "#5B9BD5",
+            "url": "https://www.youtube.com/watch?v=f77SKdyn-1Y"
         },
     }
 
@@ -411,12 +415,16 @@ def _render_sounds():
         list(sounds.keys()),
     )
 
-    if st.button("▶️ Play Sound", use_container_width=True):
-        st.info(f"🎵 **Now Playing:** {selected_sound}\n\n"
-                f"_{sounds[selected_sound]['description']}_\n\n"
-                "💡 **Tip:** For a real implementation, integrate with a sound API "
-                "(e.g., freesound.org) or host audio files on Firebase Storage. "
-                "You can use `st.audio()` with audio file URLs.")
+    if "playing_sound" not in st.session_state:
+        st.session_state.playing_sound = None
+
+    if st.button("▶️ Load & Play Sound", use_container_width=True):
+        st.session_state.playing_sound = selected_sound
+        st.rerun()
+
+    if st.session_state.playing_sound:
+        st.markdown(f"### Now Playing: {st.session_state.playing_sound}")
+        st.video(sounds[st.session_state.playing_sound]["url"])
 
     # Duration control
     st.markdown("---")

@@ -13,9 +13,7 @@ def render_settings():
     user = st.session_state.get("user", {})
 
     st.markdown("""
-    <h1 style="font-size:32px; font-weight:800;
-        background: linear-gradient(90deg, #FFD93D, #FF8C42);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+    <h1 style="font-size:32px; font-weight:800; color:#FFD93D;">
         ⚙️ Settings
     </h1>
     """, unsafe_allow_html=True)
@@ -111,24 +109,12 @@ def _render_connections():
 
     if not fit_connected:
         fit_service = GoogleFitService()
-        auth_url = fit_service.get_auth_url()
+        user_id = st.session_state["user"].get("user_id", "demo")
+        auth_url = fit_service.get_auth_url(user_id)
         if auth_url:
             st.markdown(f"[🔗 Connect Google Fit]({auth_url})")
         else:
             st.info("ℹ️ Configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env to enable Google Fit.")
-
-        # Handle OAuth callback
-        query_params = st.query_params
-        code = query_params.get("code")
-        if code:
-            with st.spinner("Connecting to Google Fit..."):
-                creds = fit_service.exchange_code(code)
-                if creds:
-                    st.session_state["google_fit_credentials"] = creds
-                    st.session_state["google_fit_connected"] = True
-                    st.success("✅ Google Fit connected successfully!")
-                    st.query_params.clear()
-                    st.rerun()
     else:
         if st.button("🔌 Disconnect Google Fit"):
             st.session_state["google_fit_connected"] = False

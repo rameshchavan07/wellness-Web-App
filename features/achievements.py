@@ -12,9 +12,7 @@ def render_achievements():
     user_id = st.session_state.get("user", {}).get("user_id", "demo_user_001")
 
     st.markdown("""
-    <h1 style="font-size:32px; font-weight:800; 
-        background: linear-gradient(90deg, #FFD93D, #FF6B6B);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+    <h1 style="font-size:32px; font-weight:800; color:#FFD93D;">
         🏆 Achievements
     </h1>
     <p style="color:rgba(255,255,255,0.5); margin-bottom:24px;">

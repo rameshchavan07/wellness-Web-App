@@ -114,6 +114,9 @@ def handle_google_callback() -> dict | None:
     code = query_params.get("code")
     state = query_params.get("state")
 
+    if "error" in query_params:
+        return {"success": False, "error": f"Google Auth Error: {query_params.get('error')}"}
+
     if not code or state != "google_signin":
         return None
 

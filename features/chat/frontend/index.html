@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { background: transparent; overflow: hidden; }
+
+/* The entire widget is inside this iframe which gets made floating by JS */
+#chat-root {
+    position: fixed;
+    bottom: 0; right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    font-family: 'Inter', -apple-system, sans-serif;
+}
+
+/* ── Launcher ─────────────────────────────────── */
+#launcher {
+    width: 62px; height: 62px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6C63FF, #4ECDC4);
+    border: none; cursor: pointer; color: white; font-size: 28px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 32px rgba(108,99,255,.55);
+    transition: transform .25s, box-shadow .25s, background .25s;
+    margin-bottom: 16px;
+}
+#launcher:hover { transform: scale(1.1); box-shadow: 0 12px 40px rgba(108,99,255,.7); }
+#launcher.open { background: linear-gradient(135deg, #FF6B6B, #FF8C42); }
+
+/* ── Chat Window ──────────────────────────────── */
+#chat-win {
+    width: 370px;
+    height: 520px;
+    background: linear-gradient(160deg, #13162a, #0f111c);
+    border: 1px solid rgba(108,99,255,.25);
+    border-radius: 22px;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.04);
+    animation: fadeUp .3s cubic-bezier(.34,1.56,.64,1);
+    margin-bottom: 8px;
+}
+#chat-win.open { display: flex; }
+@keyframes fadeUp {
+    from { opacity:0; transform:translateY(16px) scale(.93); }
+    to   { opacity:1; transform:none; }
+}
+
+/* ── Header ──────────────────────────────────── */
+.c-hdr {
+    background: linear-gradient(135deg,#6C63FF,#4ECDC4);
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 11px;
+    flex-shrink: 0;
+}
+.c-av {
+    width:40px; height:40px; border-radius:50%;
+    background:rgba(255,255,255,.18); display:flex;
+    align-items:center; justify-content:center; font-size:21px;
+    box-shadow:0 2px 8px rgba(0,0,0,.2); flex-shrink:0;
+}
+.c-name { font-weight:700; color:white; font-size:15px; letter-spacing:.2px; }
+.c-status {
+    font-size:11px; color:rgba(255,255,255,.78);
+    display:flex; align-items:center; gap:5px; margin-top:2px;
+}
+.c-dot {
+    width:7px; height:7px; border-radius:50%; background:#6effc7;
+    animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+#close-btn {
+    margin-left:auto; background:rgba(255,255,255,.12); border-radius:50%;
+    width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; color:white; font-size:16px; border:none;
+    transition:background .2s, transform .2s; flex-shrink:0;
+}
+#close-btn:hover { background:rgba(255,255,255,.25); transform:scale(1.1); }
+
+/* ── Personality Pills ────────────────────────── */
+#pills {
+    padding: 10px 14px; display:flex; gap:7px; flex-shrink:0;
+    background:rgba(255,255,255,.03);
+    border-bottom:1px solid rgba(255,255,255,.06);
+}
+.pill {
+    flex:1; text-align:center; padding:7px 4px; border-radius:10px;
+    font-size:12px; font-weight:600; cursor:pointer; border:none;
+    background:rgba(255,255,255,.07); color:rgba(255,255,255,.5);
+    transition:all .2s; font-family:inherit;
+}
+.pill.active {
+    background:linear-gradient(135deg,rgba(108,99,255,.5),rgba(78,205,196,.4));
+    color:white; border:1px solid rgba(108,99,255,.4);
+    box-shadow:0 2px 10px rgba(108,99,255,.25);
+}
+.pill:hover:not(.active) { background:rgba(255,255,255,.13); color:rgba(255,255,255,.85); }
+
+/* ── Messages ─────────────────────────────────── */
+#messages {
+    flex:1; overflow-y:auto; padding:14px;
+    display:flex; flex-direction:column; gap:10px;
+    scroll-behavior:smooth;
+}
+#messages::-webkit-scrollbar { width:4px; }
+#messages::-webkit-scrollbar-track { background:transparent; }
+#messages::-webkit-scrollbar-thumb { background:rgba(108,99,255,.4); border-radius:4px; }
+.msg {
+    max-width:82%; padding:11px 15px; border-radius:16px;
+    font-size:13.5px; line-height:1.55; color:white;
+    word-break:break-word; animation:msgIn .2s ease;
+}
+@keyframes msgIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+.msg.bot {
+    background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.09);
+    color:rgba(255,255,255,.88);
+    border-radius:16px 16px 16px 4px; align-self:flex-start;
+}
+.msg.user {
+    background:linear-gradient(135deg,#6C63FF,#5a52e0);
+    color:white; border-radius:16px 16px 4px 16px;
+    align-self:flex-end;
+    box-shadow:0 4px 14px rgba(108,99,255,.35);
+}
+#typing {
+    display:none; align-self:flex-start;
+    background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:16px 16px 16px 4px;
+    padding:12px 16px; gap:5px; align-items:center;
+}
+#typing span {
+    width:7px; height:7px; border-radius:50%;
+    background:rgba(255,255,255,.5);
+    display:inline-block;
+    animation:bounce 1.2s infinite;
+}
+#typing span:nth-child(2) { animation-delay:.2s; }
+#typing span:nth-child(3) { animation-delay:.4s; }
+@keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-7px)} }
+
+/* ── Input Area ───────────────────────────────── */
+#input-area {
+    border-top:1px solid rgba(255,255,255,.065);
+    padding:12px 14px; display:flex; gap:8px;
+    align-items:center; flex-shrink:0;
+    background:rgba(255,255,255,.02);
+}
+#msg-input {
+    flex:1; background:rgba(255,255,255,.07);
+    border:1.5px solid rgba(108,99,255,.25); border-radius:14px;
+    color:white; padding:11px 15px; font-size:13px; outline:none;
+    font-family:inherit; transition:border-color .2s, background .2s;
+}
+#msg-input:focus { border-color:rgba(108,99,255,.75); background:rgba(255,255,255,.1); }
+#msg-input::placeholder { color:rgba(255,255,255,.28); }
+#send-btn {
+    width:44px; height:44px; border-radius:13px;
+    background:linear-gradient(135deg,#6C63FF,#4ECDC4);
+    border:none; color:white; font-size:18px; cursor:pointer; flex-shrink:0;
+    transition:transform .2s, box-shadow .2s;
+    box-shadow:0 3px 12px rgba(108,99,255,.4);
+    display:flex; align-items:center; justify-content:center;
+}
+#send-btn:hover { transform:scale(1.08); box-shadow:0 5px 18px rgba(108,99,255,.6); }
+#send-btn:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+</style>
+</head>
+<body>
+<div id="chat-root">
+    <div id="chat-win">
+        <div class="c-hdr">
+            <div class="c-av">🤖</div>
+            <div>
+                <div class="c-name">DayBot</div>
+                <div class="c-status"><div class="c-dot"></div>Online · Wellness AI</div>
+            </div>
+            <button id="close-btn" title="Close">✕</button>
+        </div>
+
+        <div id="pills">
+            <button class="pill active" data-val="Friendly">😊 Friendly</button>
+            <button class="pill" data-val="Professional">🧑‍💼 Pro</button>
+            <button class="pill" data-val="Rude">😈 Rude</button>
+        </div>
+
+        <div id="messages">
+            <div id="typing"><span></span><span></span><span></span></div>
+        </div>
+
+        <div id="input-area">
+            <input id="msg-input" type="text" placeholder="Ask DayBot anything..." />
+            <button id="send-btn" title="Send">➤</button>
+        </div>
+    </div>
+
+    <button id="launcher" title="Chat with DayBot">💬</button>
+</div>
+
+<script>
+// ── Make the iframe itself float ───────────────────────────────────
+(function positionSelf() {
+    try {
+        var frame = window.frameElement;
+        if (!frame) return;
+        // Size the iframe to fit our widget
+        frame.style.cssText = [
+            'position:fixed!important',
+            'bottom:28px!important',
+            'right:28px!important',
+            'width:420px!important',
+            'height:640px!important',
+            'border:none!important',
+            'background:transparent!important',
+            'z-index:2147483647!important',
+            'overflow:visible!important',
+            'pointer-events:all!important'
+        ].join(';');
+        // Zero out Streamlit's wrapper divs so they don't push content
+        var p = frame.parentElement;
+        for (var i = 0; i < 6 && p && p.tagName !== 'BODY'; i++) {
+            p.style.cssText = 'position:fixed!important;bottom:0!important;right:0!important;width:0!important;height:0!important;overflow:visible!important;padding:0!important;margin:0!important;border:none!important;background:transparent!important;';
+            p = p.parentElement;
+        }
+    } catch(e) { console.warn('DayBot float:', e); }
+})();
+
+// ── Streamlit component setup ──────────────────────────────────────
+function sendToStreamlit(value) {
+    window.parent.postMessage({
+        type: 'streamlit:setComponentValue',
+        isStreamlitMessage: true,
+        apiVersion: 1,
+        value: value
+    }, '*');
+}
+// Tell Streamlit the component is ready and set initial height to 0
+window.parent.postMessage({ type: 'streamlit:componentReady', apiVersion: 1 }, '*');
+window.parent.postMessage({ type: 'streamlit:setFrameHeight', height: 0 }, '*');
+
+// Receive data from Streamlit (messages + personality)
+window.addEventListener('message', function(event) {
+    if (event.data.type === 'streamlit:render') {
+        var args = event.data.args || {};
+        if (args.messages) renderMessages(args.messages);
+        if (args.personality) setPersonality(args.personality);
+    }
+});
+
+// ── UI refs ────────────────────────────────────────────────────────
+var launcher  = document.getElementById('launcher');
+var chatWin   = document.getElementById('chat-win');
+var closeBtn  = document.getElementById('close-btn');
+var msgBox    = document.getElementById('messages');
+var typing    = document.getElementById('typing');
+var input     = document.getElementById('msg-input');
+var sendBtn   = document.getElementById('send-btn');
+var pills     = document.querySelectorAll('.pill');
+
+var isOpen       = false;
+var isWaiting    = false;
+var personality  = 'Friendly';
+
+// ── Personality pills ──────────────────────────────────────────────
+pills.forEach(function(p) {
+    p.addEventListener('click', function() {
+        pills.forEach(function(x) { x.classList.remove('active'); });
+        p.classList.add('active');
+        personality = p.dataset.val;
+    });
+});
+
+function setPersonality(val) {
+    personality = val;
+    pills.forEach(function(p) {
+        p.classList.toggle('active', p.dataset.val === val);
+    });
+}
+
+// ── Toggle open/close ──────────────────────────────────────────────
+function toggleChat() {
+    isOpen = !isOpen;
+    chatWin.classList.toggle('open', isOpen);
+    launcher.classList.toggle('open', isOpen);
+    launcher.textContent = isOpen ? '✕' : '💬';
+    if (isOpen) {
+        scrollBottom();
+        setTimeout(function() { input.focus(); }, 300);
+    }
+}
+launcher.addEventListener('click', toggleChat);
+closeBtn.addEventListener('click', toggleChat);
+
+// ── Render messages ────────────────────────────────────────────────
+function renderMessages(msgs) {
+    // Clear and re-render
+    msgBox.innerHTML = '';
+    msgBox.appendChild(typing);
+    msgs.forEach(function(m) { appendMsg(m.role, m.content); });
+    if (isWaiting) { typing.style.display = 'flex'; } else { typing.style.display = 'none'; }
+    scrollBottom();
+}
+
+function appendMsg(role, text) {
+    var d = document.createElement('div');
+    d.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+    d.textContent = text;
+    msgBox.insertBefore(d, typing);
+    scrollBottom();
+}
+
+function scrollBottom() { msgBox.scrollTop = msgBox.scrollHeight; }
+
+// ── Send message ───────────────────────────────────────────────────
+function sendMessage() {
+    var text = input.value.trim();
+    if (!text || isWaiting) return;
+
+    // Optimistic UI
+    appendMsg('user', text);
+    input.value = '';
+    isWaiting = true;
+    sendBtn.disabled = true;
+    typing.style.display = 'flex';
+    scrollBottom();
+
+    // Send to Streamlit backend via component value
+    sendToStreamlit({
+        msg: text,
+        msg_id: 'msg_' + Date.now(),
+        personality: personality
+    });
+}
+
+sendBtn.addEventListener('click', sendMessage);
+input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') sendMessage();
+});
+
+// ── Handle response from Streamlit (re-render with updated messages) ─
+// When Streamlit reruns and sends updated messages, isWaiting resets
+function onRender(msgs, pers) {
+    isWaiting = false;
+    sendBtn.disabled = false;
+    typing.style.display = 'none';
+    renderMessages(msgs);
+    if (pers) setPersonality(pers);
+}
+
+// The streamlit:render event fires on every rerun
+window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'streamlit:render') {
+        var args = event.data.args || {};
+        onRender(args.messages || [], args.personality || 'Friendly');
+    }
+});
+</script>
+</body>
+</html>
