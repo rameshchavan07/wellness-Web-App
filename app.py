@@ -3,7 +3,7 @@ DayScore — Smart Wellness Tracking App
 Main application entry point.
 Built with Streamlit + Firebase + Google Fit.
 """
-
+#streamlit run app.py
 import streamlit as st
 from streamlit_option_menu import option_menu
 
