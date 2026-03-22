@@ -7,9 +7,11 @@ import streamlit as st
 from services.achievement_service import AchievementService
 
 
+from config.settings import AppConfig
+
 def render_achievements():
     """Render the achievements page."""
-    user_id = st.session_state.get("user", {}).get("user_id", "demo_user_001")
+    user_id = st.session_state.get("user", {}).get("user_id", AppConfig.DEMO_USER_ID)
 
     st.markdown("""
     <h1 style="font-size:32px; font-weight:800; color:#FFD93D;">

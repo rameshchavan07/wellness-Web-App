@@ -30,6 +30,7 @@ class AppConfig:
     APP_NAME = get_secret("APP_NAME", "DayScore")
     APP_VERSION = get_secret("APP_VERSION", "1.0.0")
     DEBUG = get_secret("DEBUG", "False").lower() == "true"
+    DEMO_USER_ID = "demo_user_001"
 
 
 class FirebaseConfig:

@@ -25,13 +25,14 @@ from utils.helpers import (
     get_personalized_suggestions,
     generate_weekly_demo_scores,
 )
-
+from config.settings import AppConfig
+import html
 
 def render_dashboard():
     """Render the main dashboard page."""
     user = st.session_state.get("user", {})
-    user_name = user.get("name", "User")
-    user_id = user.get("user_id", "demo_user_001")
+    user_name = html.escape(user.get("name", "User"))
+    user_id = user.get("user_id", AppConfig.DEMO_USER_ID)
 
     # ── Header ─────────────────────────────────────────
     greeting = get_greeting()
@@ -55,7 +56,7 @@ def render_dashboard():
         # Check Firebase to see if the user already logged a mood today
         db = get_firestore_client()
         today_str = datetime.utcnow().strftime("%Y-%m-%d")
-        if db and user_id != "demo_user_001":
+        if db and user_id != AppConfig.DEMO_USER_ID:
             try:
                 doc = db.collection("users").document(user_id).collection("daily_logs").document(today_str).get()
                 if doc.exists:
@@ -105,28 +106,24 @@ def render_dashboard():
     if st.session_state.get("mood_logged"):
         total_score += 50
         
-    # Save to Firestore
-    db = get_firestore_client()
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
-    
-    if db and user_id != "demo_user_001":
-        log_ref = db.collection("users").document(user_id).collection("daily_logs").document(today_str)
-        log_data = {
-            "date": today_str,
-            "steps": fitness_data.get("steps", 0),
-            "calories": fitness_data.get("calories", 0),
-            "sleep": fitness_data.get("sleep", 0),
-            "heart_rate": fitness_data.get("heart_rate", 0),
-            "total_score": total_score,
-            "grade": grade,
-        }
+    # Save historical snapshot to Firestore
+    if user_id != AppConfig.DEMO_USER_ID:
+        # Save mood if configured
         if st.session_state.get("mood_logged"):
-            log_data["mood"] = st.session_state.mood_logged
-            
-        try:
-            log_ref.set(log_data, merge=True)
-        except Exception as e:
-            st.error(f"Failed to save to Firebase: {e}")
+            db = get_firestore_client()
+            if db:
+                try:
+                    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+                    db.collection("users").document(user_id).collection("daily_logs").document(today_str).set(
+                        {"mood": st.session_state.mood_logged, "date": today_str}, merge=True
+                    )
+                except Exception:
+                    pass
+        
+        # Trigger permanent daily score background sync
+        # Uses st.session_state variables so we don't block the UI rendering if it's slightly slow.
+        if google_creds:
+            fit_service.sync_daily_data_to_firestore(user_id, google_creds)
 
     # Update streak
     streak = streak_service.update_streak(user_id)
@@ -198,6 +195,47 @@ def render_dashboard():
         </div>
         """, unsafe_allow_html=True)
 
+    # ── AI Score Forecast ──────────────────────────────
+    from services.prediction_service import PredictionService
+    pred_service = PredictionService()
+    prediction = pred_service.predict_tomorrow(user_id)
+    
+    if prediction.get("success"):
+        st.markdown(f"""
+        <div class="metric-card" style="margin-top:16px; background: linear-gradient(135deg, rgba(108,99,255,0.1), rgba(78,205,196,0.1)); border-left: 4px solid #4ECDC4;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h3 style="margin:0; font-size:18px;">🤖 Tomorrow's AI Forecast</h3>
+                    <p style="margin:4px 0 0 0; color:rgba(255,255,255,0.7); font-size:14px;">{prediction['message']}</p>
+                </div>
+                <div style="text-align:right;">
+                    <span style="font-size:32px; font-weight:800; color:white;">{prediction['predicted_score']}</span>
+                    <span style="color:rgba(255,255,255,0.5); font-size:14px;">/100</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ── Social Share ───────────────────────────────────
+    st.markdown("---")
+    share_cols = st.columns([3, 1])
+    with share_cols[0]:
+        st.markdown(f"### 📣 Share Your Score")
+        st.markdown("Let your friends know how you are doing today!")
+        share_text = f"🔥 I just scored {total_score}/100 on my DayScore today! ({fitness_data.get('steps', 0)} steps and {fitness_data.get('sleep', 0)}h of sleep). Check out your own score at dayscore.app!"
+        st.code(share_text, language="markdown")
+    with share_cols[1]:
+        st.markdown("<br>", unsafe_allow_html=True)
+        # Using a mailto link or web share API workaround
+        twitter_url = f"https://twitter.com/intent/tweet?text={share_text.replace(' ', '%20').replace('/', '%2F').replace('(', '%28').replace(')', '%29')}"
+        st.markdown(f"""
+        <a href="{twitter_url}" target="_blank" style="text-decoration:none;">
+            <div style="background:#1DA1F2; color:white; border-radius:12px; padding:12px; text-align:center; font-weight:600; margin-bottom:12px; transition:all 0.3s ease;">
+                🐦 Share to Twitter
+            </div>
+        </a>
+        """, unsafe_allow_html=True)
+
     # ── Score Breakdown ────────────────────────────────
     st.markdown("---")
     st.markdown("### 📊 Score Breakdown")
@@ -228,7 +266,7 @@ def render_dashboard():
     weekly_scores = [0] * 7
     day_labels = get_day_labels(7)
     
-    if db and user_id != "demo_user_001":
+    if db and user_id != AppConfig.DEMO_USER_ID:
         try:
             # Fetch last 7 days from Firestore natively
             logs = db.collection("users").document(user_id).collection("daily_logs").order_by("date", direction="DESCENDING").limit(7).stream()

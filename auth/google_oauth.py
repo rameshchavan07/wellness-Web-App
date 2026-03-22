@@ -18,12 +18,12 @@ GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
-# Scopes needed for profile + email
+# Scopes needed for profile + email + fitness
 GOOGLE_SIGN_IN_SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
-]
+] + GoogleFitConfig.SCOPES
 
 
 def get_google_auth_url() -> str:
@@ -149,6 +149,14 @@ def handle_google_callback() -> dict | None:
             "name": user_info.get("name", ""),
             "picture": user_info.get("picture", ""),
             "verified_email": user_info.get("verified_email", False),
+        },
+        "raw_tokens": {
+            "token": access_token,
+            "refresh_token": tokens.get("refresh_token", ""),
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "client_id": GoogleFitConfig.CLIENT_ID,
+            "client_secret": GoogleFitConfig.CLIENT_SECRET,
+            "scopes": tokens.get("scope", "").split(),
         },
         "access_token": access_token,
         "id_token": tokens.get("id_token", ""),

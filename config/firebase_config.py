@@ -67,6 +67,7 @@ def is_firebase_available() -> bool:
     return _firebase_available
 
 
+@st.cache_resource
 def get_firestore_client():
     """Get Firestore database client."""
     try:
@@ -78,6 +79,7 @@ def get_firestore_client():
         return None
 
 
+@st.cache_resource
 def get_firebase_auth():
     """Get Firebase Auth instance."""
     try:

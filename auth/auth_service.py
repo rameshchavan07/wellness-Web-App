@@ -113,16 +113,33 @@ class AuthService:
 
     def sign_in(self, email: str, password: str) -> dict:
         """
-        Sign in an existing user.
-        
-        Note: Firebase Admin SDK doesn't support password verification directly.
-        For production, use Firebase Auth REST API or a client SDK.
-        Here we verify the user exists and trust the password for demo purposes.
+        Sign in an existing user securely using the Firebase REST API.
         """
+        import requests
+        from config.settings import FirebaseConfig
+        
         try:
             if self.auth:
-                # Verify user exists
-                user_record = self.auth.get_user_by_email(email)
+                # Need API_KEY to verify password via REST API
+                if not FirebaseConfig.API_KEY:
+                    return {"success": False, "error": "Server misconfiguration. Missing API Key."}
+                
+                # Verify password via REST API
+                url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FirebaseConfig.API_KEY}"
+                payload = {"email": email, "password": password, "returnSecureToken": True}
+                res = requests.post(url, json=payload)
+                
+                if res.status_code != 200:
+                    error_msg = res.json().get("error", {}).get("message", "Login failed")
+                    if error_msg in ["EMAIL_NOT_FOUND", "INVALID_PASSWORD", "INVALID_LOGIN_CREDENTIALS"]:
+                        return {"success": False, "error": "Invalid email or password."}
+                    return {"success": False, "error": f"Login failed: {error_msg}"}
+                
+                auth_data = res.json()
+                uid = auth_data["localId"]
+                
+                # Get user record
+                user_record = self.auth.get_user(uid)
                 user_data = {
                     "user_id": user_record.uid,
                     "name": user_record.display_name or "User",
@@ -137,7 +154,7 @@ class AuthService:
                         user_data["name"] = extra.get("name", user_data["name"])
                         user_data["streak"] = extra.get("streak", 0)
                         user_data["total_points"] = extra.get("total_points", 0)
-                return {"success": True, "user": user_data, "token": "admin_session"}
+                return {"success": True, "user": user_data, "token": auth_data.get("idToken", "admin_session")}
             else:
                 return self._demo_sign_in(email)
         except Exception as e:
@@ -180,8 +197,9 @@ class AuthService:
     # ── Demo Mode Helpers ──────────────────────────────
     def _demo_sign_up(self, email: str, name: str) -> dict:
         """Demo mode registration (no Firebase)."""
+        from config.settings import AppConfig
         user_data = {
-            "user_id": "demo_user_001",
+            "user_id": AppConfig.DEMO_USER_ID,
             "name": name,
             "email": email,
             "profile_photo": "",
@@ -193,8 +211,9 @@ class AuthService:
 
     def _demo_sign_in(self, email: str) -> dict:
         """Demo mode sign-in (no Firebase)."""
+        from config.settings import AppConfig
         user_data = {
-            "user_id": "demo_user_001",
+            "user_id": AppConfig.DEMO_USER_ID,
             "name": "Demo User",
             "email": email,
             "profile_photo": "",

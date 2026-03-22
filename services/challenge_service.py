@@ -140,7 +140,7 @@ class ChallengeService:
                 "goal_value": 10000,
                 "metric": "steps",
                 "duration_days": 7,
-                "participants": ["demo_user_001", "user_alice", "user_bob"],
+                "participants": [AppConfig.DEMO_USER_ID, "user_alice", "user_bob"],
                 "status": "active",
             },
             {
@@ -151,7 +151,7 @@ class ChallengeService:
                 "goal_value": 7,
                 "metric": "sleep",
                 "duration_days": 7,
-                "participants": ["demo_user_001", "user_carol"],
+                "participants": [AppConfig.DEMO_USER_ID, "user_carol"],
                 "status": "active",
             },
             {
@@ -169,9 +169,10 @@ class ChallengeService:
 
     @staticmethod
     def _get_demo_leaderboard() -> list:
+        from config.settings import AppConfig
         return [
             {"user_id": "user_alice", "user_name": "Alice M.", "score": 92.5, "rank": 1},
-            {"user_id": "demo_user_001", "user_name": "You", "score": 85.0, "rank": 2},
+            {"user_id": AppConfig.DEMO_USER_ID, "user_name": "You", "score": 85.0, "rank": 2},
             {"user_id": "user_bob", "user_name": "Bob K.", "score": 78.3, "rank": 3},
             {"user_id": "user_carol", "user_name": "Carol S.", "score": 74.1, "rank": 4},
             {"user_id": "user_dave", "user_name": "Dave R.", "score": 71.8, "rank": 5},

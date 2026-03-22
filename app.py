@@ -28,7 +28,7 @@ def render_login_page():
     """Render the login / sign-up page."""
     auth_service = AuthService()
 
-    # Handle Google Sign-In callback
+    # Handle Google Sign-In / Fit Setup callback all at once
     google_callback_res = handle_google_callback()
     if google_callback_res:
         if google_callback_res.get("success"):
@@ -37,12 +37,18 @@ def render_login_page():
                 st.session_state["authenticated"] = True
                 st.session_state["user"] = sign_in_res["user"]
                 st.session_state["token"] = sign_in_res.get("token", "")
-                st.success("✅ Signed in with Google!")
+                
+                # Store the Google Fit payload!
+                if "raw_tokens" in google_callback_res:
+                    st.session_state["google_fit_credentials"] = google_callback_res["raw_tokens"]
+                    st.session_state["google_fit_connected"] = True
+                    
+                st.success("✅ Connected to Google & DayScore!")
                 st.rerun()
             else:
                 st.error(sign_in_res["error"])
         else:
-            st.error(google_callback_res.get("error", "Google sign-in failed."))
+            st.error(google_callback_res.get("error", "Google auth failed."))
     # Centered branding
     st.markdown("""
     <div style="text-align:center; padding:60px 20px 40px 20px;">
@@ -174,11 +180,14 @@ def render_main_app():
         """, unsafe_allow_html=True)
 
         # User info
+        import html
+        safe_name = html.escape(user.get('name', 'User'))
+        safe_email = html.escape(user.get('email', ''))
         st.markdown(f"""
         <div style="text-align:center; padding:8px; margin-bottom:16px;
             background:rgba(108,99,255,0.1); border-radius:12px;">
-            <div style="font-weight:600; color:white;">{user.get('name', 'User')}</div>
-            <div style="font-size:12px; color:rgba(255,255,255,0.4);">{user.get('email', '')}</div>
+            <div style="font-weight:600; color:white;">{safe_name}</div>
+            <div style="font-size:12px; color:rgba(255,255,255,0.4);">{safe_email}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -259,49 +268,14 @@ def render_main_app():
 
 
 # ── Global Callback Handlers ───────────────────────────
-def process_google_fit_callback():
-    """Restores session and processes Google Fit connection after OAuth redirect."""
-    query_params = st.query_params
-    state = query_params.get("state", "")
-    code = query_params.get("code")
-
-    if state.startswith("gfit__") and code:
-        user_id = state.replace("gfit__", "")
-        
-        with st.spinner("Restoring session and linking Google Fit..."):
-            fit_service = GoogleFitService()
-            creds = fit_service.exchange_code(code)
-            
-            if creds:
-                # We lost session on redirect, so manually restore the user!
-                auth_service = AuthService()
-                if user_id.startswith("demo_"):
-                    user_profile = {"user_id": user_id, "name": "Demo User"}
-                else:
-                    user_profile = auth_service.get_user_profile(user_id)
-                
-                if user_profile:
-                    st.session_state["authenticated"] = True
-                    st.session_state["user"] = user_profile
-                    st.session_state["google_fit_credentials"] = creds
-                    st.session_state["google_fit_connected"] = True
-                    st.success("✅ Google Fit connected successfully! Session restored.")
-                else:
-                    st.error("Could not restore user profile. Please log in again.")
-            
-            # Clear params so it doesn't trigger again
-            st.query_params.clear()
-            st.rerun()
+# Note: Google Fit callback is now unified with handle_google_callback() inside render_login_page.
 
 # ── Entry Point ────────────────────────────────────────
 def main():
-    process_google_fit_callback()
-    
     if st.session_state.get("authenticated"):
         render_main_app()
     else:
         render_login_page()
-
 
 if __name__ == "__main__":
     main()
