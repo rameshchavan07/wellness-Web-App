@@ -127,17 +127,26 @@ def calculate_stats(scores: list) -> dict:
 
 
 import io
+import os
 import requests
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 
 @st.cache_resource
 def _get_scorecard_font(size: int):
-    """Fetch Roboto font from Google Fonts for premium look."""
+    """Fetch Roboto font from local cache or download it for premium look."""
+    font_dir = os.path.join("assets", "fonts")
+    font_path = os.path.join(font_dir, "Roboto-Bold.ttf")
+    
     try:
-        url = "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf"
-        r = requests.get(url, timeout=5)
-        return ImageFont.truetype(io.BytesIO(r.content), size=size)
+        os.makedirs(font_dir, exist_ok=True)
+        if not os.path.exists(font_path):
+            url = "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf"
+            r = requests.get(url, timeout=10)
+            with open(font_path, 'wb') as f:
+                f.write(r.content)
+        
+        return ImageFont.truetype(font_path, size=size)
     except Exception:
         try:
             return ImageFont.truetype("arial.ttf", size=size)

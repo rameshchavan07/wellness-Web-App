@@ -24,3 +24,4 @@ plotly
 requests
 Pillow
 streamlit-option-menu
+streamlit-autorefresh

@@ -259,8 +259,11 @@ def render_main_app():
             render_settings()
     except Exception as page_err:
         import traceback
-        st.error(f"🚨 Page error: {page_err}")
-        st.code(traceback.format_exc())
+        if AppConfig.DEBUG:
+            st.error(f"🚨 Page error: {page_err}")
+            st.code(traceback.format_exc())
+        else:
+            st.error("🚨 An unexpected error occurred while loading this page.")
 
     # ── Global Floating Chat ───────────────────────────
     try:

@@ -2,9 +2,9 @@
 DayScore - Direct Messaging Feature
 Provides an Inbox UI for user-to-user chatting.
 """
-
 import streamlit as st
 import html
+from streamlit_autorefresh import st_autorefresh
 from services.messaging_service import MessagingService
 from config.settings import AppConfig
 
@@ -66,9 +66,8 @@ def render_messages():
         # Chat Header
         st.markdown(f"### 💬 Chat with {html.escape(active_user['name'])}")
         
-        # Add a manual refresh button (since Streamlit doesn't auto-poll by default)
-        if st.button("🔄 Refresh Messages", key="refresh_msgs"):
-            st.rerun()
+        # Add auto-refresh mechanism (checks every 3 seconds)
+        st_autorefresh(interval=3000, key="chat_refresh")
             
         st.markdown("<hr style='margin: 8px 0; opacity: 0.2;'>", unsafe_allow_html=True)
         
@@ -85,8 +84,20 @@ def render_messages():
                 for msg in messages:
                     is_me = msg["sender_id"] == current_user_id
                     avatar = "🧘" if is_me else "👤"
+                    
+                    # Format timestamp
+                    from datetime import datetime
+                    time_str = ""
+                    try:
+                        dt = datetime.fromisoformat(msg.get("timestamp", "").replace("Z", "+00:00"))
+                        time_str = dt.strftime("%b %d, %I:%M %p")
+                    except Exception:
+                        pass
+                        
                     with st.chat_message("user" if is_me else "assistant", avatar=avatar):
                         st.write(msg["text"])
+                        if time_str:
+                            st.caption(time_str)
                         
         # Message Input Box
         new_msg = st.chat_input(f"Message {html.escape(active_user['name'])}...")
