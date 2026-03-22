@@ -4,7 +4,8 @@ Main dashboard page with DayScore gauge, metrics, and weekly trends.
 """
 
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
+from config.firebase_config import get_firestore_client
 
 from services.scoring_service import ScoringService
 from services.google_fit_service import GoogleFitService
@@ -47,6 +48,44 @@ def render_dashboard():
     </div>
     """, unsafe_allow_html=True)
 
+    # ── Interactive Morning Check-in ───────────────────
+    if "mood_logged" not in st.session_state:
+        st.session_state.mood_logged = False
+        
+        # Check Firebase to see if the user already logged a mood today
+        db = get_firestore_client()
+        today_str = datetime.utcnow().strftime("%Y-%m-%d")
+        if db and user_id != "demo_user_001":
+            try:
+                doc = db.collection("users").document(user_id).collection("daily_logs").document(today_str).get()
+                if doc.exists:
+                    data = doc.to_dict()
+                    if "mood" in data:
+                        st.session_state.mood_logged = data["mood"]
+            except Exception:
+                pass
+        
+    if not st.session_state.mood_logged:
+        st.markdown("""
+        <div class="metric-card" style="margin-bottom:24px; text-align:center; background:rgba(108,99,255,0.15);">
+            <h3 style="margin-top:0;">Good morning! How are you feeling today?</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        cols = st.columns(4)
+        emojis = [("🤩", "Great"), ("😊", "Good"), ("😐", "Okay"), ("😞", "Rough")]
+        for i, (emoji, label) in enumerate(emojis):
+            with cols[i]:
+                if st.button(f"{emoji} {label}", use_container_width=True, key=f"mood_{i}"):
+                    st.session_state.mood_logged = emoji
+                    st.rerun()
+    else:
+        st.markdown(f"""
+        <div class="metric-card" style="margin-bottom:24px; display:flex; justify-content:space-between; align-items:center;">
+            <div><span style="font-size:24px;">{st.session_state.mood_logged}</span> <strong>Mood Logged</strong></div>
+            <div style="color:#4ECDC4; font-weight:600;">+50 Bonus Points!</div>
+        </div>
+        """, unsafe_allow_html=True)
+
     # ── Fetch Data ─────────────────────────────────────
     fit_service = GoogleFitService()
     scoring_service = ScoringService()
@@ -62,6 +101,32 @@ def render_dashboard():
     grade = score_result["grade"]
     breakdown = score_result["breakdown"]
     message = score_result["message"]
+
+    if st.session_state.get("mood_logged"):
+        total_score += 50
+        
+    # Save to Firestore
+    db = get_firestore_client()
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    
+    if db and user_id != "demo_user_001":
+        log_ref = db.collection("users").document(user_id).collection("daily_logs").document(today_str)
+        log_data = {
+            "date": today_str,
+            "steps": fitness_data.get("steps", 0),
+            "calories": fitness_data.get("calories", 0),
+            "sleep": fitness_data.get("sleep", 0),
+            "heart_rate": fitness_data.get("heart_rate", 0),
+            "total_score": total_score,
+            "grade": grade,
+        }
+        if st.session_state.get("mood_logged"):
+            log_data["mood"] = st.session_state.mood_logged
+            
+        try:
+            log_ref.set(log_data, merge=True)
+        except Exception as e:
+            st.error(f"Failed to save to Firebase: {e}")
 
     # Update streak
     streak = streak_service.update_streak(user_id)
@@ -160,10 +225,25 @@ def render_dashboard():
     st.markdown("---")
     st.markdown("### 📈 Weekly Trend")
 
-    weekly_scores = generate_weekly_demo_scores()
+    weekly_scores = [0] * 7
+    day_labels = get_day_labels(7)
+    
+    if db and user_id != "demo_user_001":
+        try:
+            # Fetch last 7 days from Firestore natively
+            logs = db.collection("users").document(user_id).collection("daily_logs").order_by("date", direction="DESCENDING").limit(7).stream()
+            log_dict = {doc.to_dict().get("date"): doc.to_dict().get("total_score", 0) for doc in logs}
+            
+            for i in range(7):
+                date_str = (datetime.utcnow() - timedelta(days=6-i)).strftime("%Y-%m-%d")
+                weekly_scores[i] = log_dict.get(date_str, 0)
+        except Exception as e:
+            weekly_scores = generate_weekly_demo_scores()
+    else:
+        weekly_scores = generate_weekly_demo_scores()
+
     # Replace last day with today's actual score
     weekly_scores[-1] = total_score
-    day_labels = get_day_labels(7)
 
     st.plotly_chart(
         render_weekly_chart(weekly_scores, day_labels),

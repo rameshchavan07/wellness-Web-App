@@ -37,14 +37,15 @@ def render_challenges():
                 participant_count = len(ch.get("participants", []))
                 is_joined = user_id in ch.get("participants", [])
 
-                st.markdown(f"""
+                desc_safe = ch.get('description', '').replace('\\n', '<br>')
+                card_html = f"""
                 <div class="challenge-card">
                     <div style="display:flex; justify-content:space-between; align-items:start;">
                         <div>
                             <h3 style="margin:0; color:white; font-size:18px;">{ch.get('name', '')}</h3>
-                            <p style="color:rgba(255,255,255,0.6); margin:4px 0 12px 0; font-size:14px;">
-                                {ch.get('description', '')}
-                            </p>
+                            <div style="color:rgba(255,255,255,0.6); margin:4px 0 12px 0; font-size:14px;">
+                                {desc_safe}
+                            </div>
                         </div>
                         <div style="background:rgba(255,107,107,0.2); border-radius:8px; padding:8px 12px; text-align:center;">
                             <div style="font-size:18px; font-weight:700; color:#FF6B6B;">{participant_count}</div>
@@ -57,7 +58,10 @@ def render_challenges():
                         <span>📏 {ch.get('metric', 'steps').title()}</span>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """
+                
+                clean_html = card_html.replace('\\n', '').replace('\\r', '')
+                st.html(clean_html)
 
                 if not is_joined:
                     if st.button(f"Join Challenge", key=f"join_{ch.get('id', '')}"):
@@ -123,7 +127,7 @@ def render_challenges():
                 extra_class = "top-3" if rank <= 3 else ""
                 highlight = "border-left: 3px solid #6C63FF;" if is_you else ""
 
-                st.markdown(f"""
+                leader_html = f"""
                 <div class="leaderboard-row {extra_class}" style="{highlight}">
                     <div style="display:flex; align-items:center; gap:12px;">
                         <span style="font-size:24px; min-width:36px;">{rank_icon}</span>
@@ -138,4 +142,6 @@ def render_challenges():
                         {entry.get('score', 0)}
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """
+                clean_leader = leader_html.replace('\\n', '').replace('\\r', '')
+                st.html(clean_leader)

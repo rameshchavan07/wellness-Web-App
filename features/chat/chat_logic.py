@@ -69,19 +69,21 @@ def generate_response(chat_history: list, personality: str) -> str:
 
 
 def _simulate_response(user_text, personality):
-    """Fallback when no OpenAI API key is configured."""
+    """Fallback when no API key is configured."""
     user_text = user_text.lower()
+    msg = "I'm currently in **Demo Mode** because no API key is connected. To make me smart and answer your questions, please add your `GROQ_API_KEY` or `OPENAI_API_KEY` to the `.env` file!"
+    
     if personality == "Friendly":
         if "hello" in user_text or "hi" in user_text:
-            return "Hey there! 😊 How is your day going? I'm here to help!"
-        return f"That's so interesting! 😊 I'd say you just asked about '{user_text}'. How else can I support you today?"
+            return "Hey there! 😊 " + msg
+        return f"That's a great question about '{user_text}'! 😊 Unfortunately, " + msg.lower()
         
     elif personality == "Professional":
         if "hello" in user_text or "hi" in user_text:
-            return "Hello. How may I assist you with DayScore today?"
-        return f"Regarding your query about '{user_text}', I recommend consulting the main dashboard. Please let me know if further clarification is needed."
+            return "Hello. " + msg
+        return f"Regarding '{user_text}': " + msg
         
     else: # Rude
         if "hello" in user_text or "hi" in user_text:
-            return "Oh, it's you. Hello. What do you want?"
-        return f"Seriously? You're asking about '{user_text}'? Go check the docs. But fine, I guess I'll look into it for you."
+            return "Oh, it's you. Look, " + msg.lower()
+        return f"Seriously? You expect me to know about '{user_text}' without a brain? " + msg
