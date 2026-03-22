@@ -235,6 +235,23 @@ def render_dashboard():
             </div>
         </a>
         """, unsafe_allow_html=True)
+        
+        # Instagram Image Download
+        from utils.helpers import generate_scorecard_image
+        img_buf = generate_scorecard_image(
+            user_name=user_name,
+            score=total_score,
+            steps=fitness_data.get('steps', 0),
+            sleep=fitness_data.get('sleep', 0)
+        )
+        st.download_button(
+            label="📸 Get IG Scorecard",
+            data=img_buf,
+            file_name="dayscore_instagram.png",
+            mime="image/png",
+            use_container_width=True,
+            type="primary"
+        )
 
     # ── Score Breakdown ────────────────────────────────
     st.markdown("---")

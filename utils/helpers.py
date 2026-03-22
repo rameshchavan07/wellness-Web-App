@@ -124,3 +124,72 @@ def calculate_stats(scores: list) -> dict:
         "worst": round(worst, 1),
         "trend": trend,
     }
+
+
+import io
+import requests
+import streamlit as st
+from PIL import Image, ImageDraw, ImageFont
+
+@st.cache_resource
+def _get_scorecard_font(size: int):
+    """Fetch Roboto font from Google Fonts for premium look."""
+    try:
+        url = "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf"
+        r = requests.get(url, timeout=5)
+        return ImageFont.truetype(io.BytesIO(r.content), size=size)
+    except Exception:
+        try:
+            return ImageFont.truetype("arial.ttf", size=size)
+        except Exception:
+            return ImageFont.load_default()
+
+def generate_scorecard_image(user_name: str, score: int, steps: int, sleep: float) -> io.BytesIO:
+    """Generates a beautiful 1080x1080 image scorecard for Instagram."""
+    # Create base image
+    img = Image.new('RGBA', (1080, 1080), color=(15, 17, 26, 255))
+    
+    # Background accents
+    overlay = Image.new('RGBA', (1080, 1080), color=(0,0,0,0))
+    draw_overlay = ImageDraw.Draw(overlay)
+    draw_overlay.ellipse((-200, -200, 500, 500), fill=(108, 99, 255, 60))
+    draw_overlay.ellipse((600, 600, 1300, 1300), fill=(78, 205, 196, 60))
+    img = Image.alpha_composite(img, overlay)
+    
+    # Drawing text
+    draw = ImageDraw.Draw(img)
+    font_huge = _get_scorecard_font(250)
+    font_large = _get_scorecard_font(100)
+    font_medium = _get_scorecard_font(60)
+    font_small = _get_scorecard_font(40)
+    
+    # Title
+    draw.text((540, 200), f"DayScore", font=font_large, fill=(108, 99, 255, 255), anchor="mm")
+    draw.text((540, 300), f"{user_name}'s Daily Health", font=font_small, fill=(200, 200, 200, 255), anchor="mm")
+    
+    # The Score
+    try:
+        display_score = int(round(float(score)))
+    except Exception:
+        display_score = score
+        
+    draw.text((540, 550), f"{display_score}", font=font_huge, fill=(78, 205, 196, 255), anchor="mm")
+    draw.text((540, 720), "out of 100", font=font_medium, fill=(120, 120, 120, 255), anchor="mm")
+    
+    # Metrics
+    # Removed emojis since PIL does not support them natively and they render as missing boxes
+    draw.text((300, 880), f"{steps:,}", font=font_medium, fill=(255, 255, 255, 255), anchor="mm")
+    draw.text((300, 950), "STEPS", font=font_small, fill=(120, 120, 120, 255), anchor="mm")
+    
+    draw.text((780, 880), f"{sleep}h", font=font_medium, fill=(255, 255, 255, 255), anchor="mm")
+    draw.text((780, 950), "SLEEP", font=font_small, fill=(120, 120, 120, 255), anchor="mm")
+    
+    # Footer
+    draw.text((540, 1040), "Track yours at dayscore.app", font=_get_scorecard_font(30), fill=(100, 100, 100, 255), anchor="mm")
+    
+    # Convert RGBA to RGB for JPEG sharing or keep as PNG
+    img = img.convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return buf

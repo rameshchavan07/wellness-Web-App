@@ -199,6 +199,7 @@ def render_main_app():
             ("Results",      "📈"),
             ("Achievements", "🏆"),
             ("Challenges",   "👥"),
+            ("Messages",     "💬"),
             ("Wellness",     "🧘"),
             ("Settings",     "⚙️"),
         ]
@@ -247,6 +248,9 @@ def render_main_app():
         elif selected == "Challenges":
             from features.challenges import render_challenges
             render_challenges()
+        elif selected == "Messages":
+            from features.messages import render_messages
+            render_messages()
         elif selected == "Wellness":
             from features.wellness import render_wellness
             render_wellness()
