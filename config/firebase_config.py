@@ -6,7 +6,7 @@ Initializes Firebase Admin SDK for server-side operations.
 import os
 import streamlit as st
 import firebase_admin
-from firebase_admin import credentials, firestore, auth as firebase_auth
+from firebase_admin import credentials, firestore, storage, auth as firebase_auth
 
 from config.settings import FirebaseConfig
 
@@ -37,7 +37,9 @@ def initialize_firebase():
                 secrets_dict["private_key"] = secrets_dict["private_key"].replace("\\n", "\n")
             
             cred = credentials.Certificate(secrets_dict)
-            firebase_admin.initialize_app(cred)
+            firebase_admin.initialize_app(cred, {
+                'storageBucket': FirebaseConfig.STORAGE_BUCKET
+            })
             _firebase_available = True
             return firebase_admin.get_app()
     except Exception as e:
@@ -48,7 +50,9 @@ def initialize_firebase():
     if os.path.exists(service_account_path):
         try:
             cred = credentials.Certificate(service_account_path)
-            firebase_admin.initialize_app(cred)
+            firebase_admin.initialize_app(cred, {
+                'storageBucket': FirebaseConfig.STORAGE_BUCKET
+            })
             _firebase_available = True
             return firebase_admin.get_app()
         except Exception:
@@ -86,6 +90,16 @@ def get_firebase_auth():
         app = initialize_firebase()
         if app:
             return firebase_auth
+        return None
+    except Exception:
+        return None
+@st.cache_resource
+def get_firebase_storage():
+    """Get Firebase Storage bucket."""
+    try:
+        app = initialize_firebase()
+        if app:
+            return storage.bucket()
         return None
     except Exception:
         return None

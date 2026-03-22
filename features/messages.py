@@ -14,6 +14,36 @@ def render_messages():
     current_user = st.session_state.get("user", {})
     current_user_id = current_user.get("user_id", AppConfig.DEMO_USER_ID)
     
+    
+    # ── Premium UI CSS Injection ──
+    st.markdown("""
+    <style>
+    /* Premium Chat Bubbles styling */
+    [data-testid="stChatMessage"] {
+        background: rgba(20, 22, 33, 0.6);
+        border: 1px solid rgba(255,255,255,0.05);
+        border-radius: 16px;
+        padding: 12px 20px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        backdrop-filter: blur(10px);
+        margin-bottom: 8px;
+        transition: transform 0.2s ease;
+    }
+    [data-testid="stChatMessage"]:hover {
+        transform: translateY(-2px);
+    }
+    [data-testid="stChatMessageAvatar"] {
+        background-color: transparent !important;
+        font-size: 24px;
+    }
+    [data-testid="stCaptionContainer"] {
+        opacity: 0.5;
+        font-size: 0.75rem;
+        margin-top: -4px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.markdown("""
     <div style="margin-bottom: 24px;">
         <h1 style="margin:0; font-size:32px; font-weight:800; 
@@ -35,19 +65,38 @@ def render_messages():
     
     with col_contacts:
         st.markdown("### 👥 People")
-        st.markdown("<hr style='margin: 8px 0; opacity: 0.2;'>", unsafe_allow_html=True)
         
         if not users:
             st.info("No other users found yet.")
         else:
-            for u in users:
-                is_selected = st.session_state.get("active_chat_user_id") == u["user_id"]
-                btn_type = "primary" if is_selected else "secondary"
-                
-                # Render a user button
-                if st.button(f"👤 {u['name']}", key=f"chat_btn_{u['user_id']}", use_container_width=True, type=btn_type):
-                    st.session_state["active_chat_user"] = u
-                    st.session_state["active_chat_user_id"] = u["user_id"]
+            from streamlit_option_menu import option_menu
+            user_names = [u["name"] for u in users]
+            active_id = st.session_state.get("active_chat_user_id")
+            
+            default_idx = 0
+            for i, u in enumerate(users):
+                if u["user_id"] == active_id:
+                    default_idx = i
+                    break
+                    
+            selected_name = option_menu(
+                menu_title=None,
+                options=user_names,
+                icons=["person"] * len(users),
+                default_index=default_idx,
+                styles={
+                    "container": {"padding": "0!important", "background-color": "transparent"},
+                    "icon": {"color": "#4ECDC4", "font-size": "16px"}, 
+                    "nav-link": {"font-size": "14px", "text-align": "left", "margin":"4px 0", "--hover-color": "rgba(108,99,255,0.1)", "border-radius": "8px"},
+                    "nav-link-selected": {"background": "linear-gradient(90deg, rgba(108,99,255,0.2), rgba(78,205,196,0.1))", "color": "white", "border-left": "3px solid #6C63FF"},
+                }
+            )
+            
+            if selected_name:
+                selected_user = next((u for u in users if u["name"] == selected_name), None)
+                if selected_user and selected_user["user_id"] != active_id:
+                    st.session_state["active_chat_user"] = selected_user
+                    st.session_state["active_chat_user_id"] = selected_user["user_id"]
                     st.rerun()
 
     # ── Main Chat Area ───────────────────────────────────────
@@ -56,23 +105,43 @@ def render_messages():
         
         if not active_user:
             st.markdown("""
-            <div style="height: 400px; display:flex; align-items:center; justify-content:center; flex-direction:column; border-left: 1px solid rgba(255,255,255,0.1);">
-                <span style="font-size: 48px; opacity:0.5;">👋</span>
-                <p style="color: rgba(255,255,255,0.5); margin-top: 16px;">Select a person to start chatting</p>
+            <div style="height: 400px; display:flex; align-items:center; justify-content:center; flex-direction:column; 
+                background: linear-gradient(180deg, rgba(108,99,255,0.02) 0%, rgba(78,205,196,0.02) 100%);
+                border-radius: 20px; border: 1px dashed rgba(255,255,255,0.1);">
+                <div style="font-size: 64px; animation: float 3s ease-in-out infinite;">💬</div>
+                <h3 style="margin-top: 16px; color: white;">Your Inbox</h3>
+                <p style="color: rgba(255,255,255,0.5);">Select a conversation to start chatting</p>
+                <style>
+                    @keyframes float {
+                        0% { transform: translateY(0px); }
+                        50% { transform: translateY(-10px); }
+                        100% { transform: translateY(0px); }
+                    }
+                </style>
             </div>
             """, unsafe_allow_html=True)
             return
 
         # Chat Header
-        st.markdown(f"### 💬 Chat with {html.escape(active_user['name'])}")
+        st.markdown(f"""
+        <div style="display:flex; align-items:center; padding: 12px 20px; background: rgba(0,0,0,0.2); 
+            border-radius: 12px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.05);">
+            <div style="font-size:24px; margin-right: 12px; background: rgba(108,99,255,0.2); 
+                height: 40px; width: 40px; display:flex; align-items:center; justify-content:center; border-radius: 50%;">
+                👤
+            </div>
+            <div>
+                <h3 style="margin:0; font-size: 18px;">{html.escape(active_user['name'])}</h3>
+                <span style="font-size: 12px; color: #4ECDC4;">● Online</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Add auto-refresh mechanism (checks every 3 seconds)
         st_autorefresh(interval=3000, key="chat_refresh")
-            
-        st.markdown("<hr style='margin: 8px 0; opacity: 0.2;'>", unsafe_allow_html=True)
         
         # Chat History Container
-        chat_container = st.container(height=500)
+        chat_container = st.container(height=500, border=False)
         
         # Load Messages
         messages = msg_service.get_conversation(current_user_id, active_user["user_id"])

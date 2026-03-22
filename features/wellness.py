@@ -6,6 +6,7 @@ Breathing exercises, relaxing games, and calming sounds.
 import streamlit as st
 import time
 import random
+from services.wellness_service import WellnessService
 
 
 def render_wellness():
@@ -351,9 +352,12 @@ def _render_sounds():
     st.markdown("### 🎵 Relaxing Sounds")
     st.markdown("""
     <p style="color:rgba(255,255,255,0.6);">
-        Choose a calming soundscape to help you relax and focus.
+        Choose a calming soundscape to help you relax and focus. 
+        Playing directly from <strong>Firebase Storage</strong> for a premium experience.
     </p>
     """, unsafe_allow_html=True)
+
+    wellness_service = WellnessService()
 
     sounds = {
         "🌧️ Rain": {
@@ -424,7 +428,17 @@ def _render_sounds():
 
     if st.session_state.playing_sound:
         st.markdown(f"### Now Playing: {st.session_state.playing_sound}")
-        st.video(sounds[st.session_state.playing_sound]["url"])
+        
+        # Try Firebase Storage first
+        audio_url = wellness_service.get_audio_url(st.session_state.playing_sound)
+        
+        if audio_url:
+            st.audio(audio_url, format="audio/mp3", autoplay=True)
+            st.info("💡 Playing native high-quality audio from Firebase Storage.")
+        else:
+            # Fallback to YouTube
+            st.video(sounds[st.session_state.playing_sound]["url"])
+            st.warning("⚠️ Native audio not found in Firebase. Falling back to YouTube.")
 
     # Duration control
     st.markdown("---")

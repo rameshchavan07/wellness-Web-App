@@ -100,6 +100,8 @@ class AuthService:
                         user_data["streak"] = existing.get("streak", 0)
                         user_data["total_points"] = existing.get("total_points", 0)
                         user_data["sleep_streak"] = existing.get("sleep_streak", 0)
+                        user_data["last_active_date"] = existing.get("last_active_date", "")
+                        user_data["created_at"] = existing.get("created_at", user_data["created_at"])
                         doc_ref.set(user_data, merge=True)
                     else:
                         doc_ref.set(user_data)
