@@ -61,7 +61,7 @@ class GoogleFitConfig:
     """Google Fit API configuration."""
     CLIENT_ID = get_secret("GOOGLE_CLIENT_ID", "")
     CLIENT_SECRET = get_secret("GOOGLE_CLIENT_SECRET", "")
-    REDIRECT_URI = get_secret("GOOGLE_REDIRECT_URI", "http://localhost:8501")
+    REDIRECT_URI = get_secret("GOOGLE_REDIRECT_URI", "https://wellness-web-app-rutu.streamlit.app")
     SCOPES = [
         "https://www.googleapis.com/auth/fitness.activity.read",
         "https://www.googleapis.com/auth/fitness.body.read",
