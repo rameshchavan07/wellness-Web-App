@@ -19,7 +19,8 @@ class PredictionService:
 
     def get_historical_data(self, user_id: str, days: int = 30) -> list:
         """Fetch the last N days of data from Firestore 'daily_scores' collection."""
-        if not self.db:
+        from config.settings import AppConfig
+        if not self.db or user_id == AppConfig.DEMO_USER_ID:
             return self._generate_demo_history(days)
 
         try:

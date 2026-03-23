@@ -95,7 +95,12 @@ def render_dashboard():
     notification_service = NotificationService()
 
     google_creds = st.session_state.get("google_fit_credentials", {})
-    fitness_data = fit_service.fetch_daily_data(google_creds)
+    
+    # Cache fitness data to prevent dashboard UI shuffle on chat toggle/pagereruns 
+    if "dashboard_fitness_data" not in st.session_state:
+        st.session_state.dashboard_fitness_data = fit_service.fetch_daily_data(google_creds)
+        
+    fitness_data = st.session_state.dashboard_fitness_data
 
     score_result = scoring_service.calculate_score(fitness_data)
     total_score = score_result["total_score"]
@@ -196,9 +201,12 @@ def render_dashboard():
         """, unsafe_allow_html=True)
 
     # ── AI Score Forecast ──────────────────────────────
-    from services.prediction_service import PredictionService
-    pred_service = PredictionService()
-    prediction = pred_service.predict_tomorrow(user_id)
+    if "dashboard_prediction" not in st.session_state:
+        from services.prediction_service import PredictionService
+        pred_service = PredictionService()
+        st.session_state.dashboard_prediction = pred_service.predict_tomorrow(user_id)
+        
+    prediction = st.session_state.dashboard_prediction
     
     if prediction.get("success"):
         st.markdown(f"""
@@ -209,7 +217,7 @@ def render_dashboard():
                     <p style="margin:4px 0 0 0; color:rgba(255,255,255,0.7); font-size:14px;">{prediction['message']}</p>
                 </div>
                 <div style="text-align:right;">
-                    <span style="font-size:32px; font-weight:800; color:white;">{prediction['predicted_score']}</span>
+                    <span style="font-size:32px; font-weight:800; color:white;">{prediction.get('predicted_score', '--')}</span>
                     <span style="color:rgba(255,255,255,0.5); font-size:14px;">/100</span>
                 </div>
             </div>
@@ -238,15 +246,15 @@ def render_dashboard():
         
         # Instagram Image Download
         from utils.helpers import generate_scorecard_image
-        img_buf = generate_scorecard_image(
+        scorecard = generate_scorecard_image(
             user_name=user_name,
             score=total_score,
             steps=fitness_data.get('steps', 0),
             sleep=fitness_data.get('sleep', 0)
         )
         st.download_button(
-            label="📸 Get IG Scorecard",
-            data=img_buf,
+            label="📸 Download Scorecard",
+            data=scorecard,
             file_name="dayscore_instagram.png",
             mime="image/png",
             use_container_width=True,
@@ -280,19 +288,23 @@ def render_dashboard():
     st.markdown("---")
     st.markdown("### 📈 Weekly Trend")
 
-    weekly_scores = [0] * 7
     day_labels = get_day_labels(7)
     
-    if db and user_id != AppConfig.DEMO_USER_ID:
-        try:
-            # Fetch last 7 days from Firestore natively
-            logs = db.collection("users").document(user_id).collection("daily_logs").order_by("date", direction="DESCENDING").limit(7).stream()
-            log_dict = {doc.to_dict().get("date"): doc.to_dict().get("total_score", 0) for doc in logs}
-            
-            for i in range(7):
-                date_str = (datetime.utcnow() - timedelta(days=6-i)).strftime("%Y-%m-%d")
-                weekly_scores[i] = log_dict.get(date_str, 0)
-        except Exception as e:
+    if "dashboard_weekly_scores" not in st.session_state:
+        weekly_scores = [0] * 7
+        db = get_firestore_client() # Ensure db client is available here
+        if db and user_id != AppConfig.DEMO_USER_ID:
+            try:
+                # Fetch last 7 days from Firestore natively
+                logs = db.collection("users").document(user_id).collection("daily_logs").order_by("date", direction="DESCENDING").limit(7).stream()
+                log_dict = {doc.to_dict().get("date"): doc.to_dict().get("total_score", 0) for doc in logs}
+                
+                for i in range(7):
+                    date_str = (datetime.utcnow() - timedelta(days=6-i)).strftime("%Y-%m-%d")
+                    weekly_scores[i] = log_dict.get(date_str, 0)
+            except Exception as e:
+                weekly_scores = generate_weekly_demo_scores()
+        else:
             weekly_scores = generate_weekly_demo_scores()
     else:
         weekly_scores = generate_weekly_demo_scores()

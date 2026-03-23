@@ -17,9 +17,6 @@ def render_chat_button_in_sidebar():
 def render_floating_chat():
     """Renders the chat popover panel using the Indian avatar floating button."""
 
-def render_floating_chat():
-    """Renders the chat popover panel using the Indian avatar floating button."""
-
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = [
             {"role": "bot", "content": "Hi! I'm DayBot 👋 How can I help you today?"}
@@ -28,27 +25,34 @@ def render_floating_chat():
         st.session_state.chat_personality = "Friendly"
     if "chat_open" not in st.session_state:
         st.session_state.chat_open = False
-
     # Read the avatar image robustly
     avatar_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "assets", "indian_avatar.png"))
     if os.path.exists(avatar_path):
         with open(avatar_path, "rb") as f:
             b64_avatar = base64.b64encode(f.read()).decode()
     else:
-        # Fallback empty or some placeholder - shouldn't happen
         b64_avatar = ""
 
+    # Escape CSS brackets with double braces {{ and }}
     st.markdown(f"""
     <style>
-    /* Float the Avatar Button Container */
+    @keyframes slideUp {{
+        from {{ transform: translateY(20px); opacity: 0; }}
+        to {{ transform: translateY(0); opacity: 1; }}
+    }}
+    @keyframes pulseGlow {{
+        0% {{ box-shadow: 0 0 5px rgba(108, 99, 255, 0.4); }}
+        50% {{ box-shadow: 0 0 15px rgba(108, 99, 255, 0.8); }}
+        100% {{ box-shadow: 0 0 5px rgba(108, 99, 255, 0.4); }}
+    }}
+
+    /* 1. Floating Avatar Button */
     div.st-key-daybot_avatar_btn {{
         position: fixed !important;
         bottom: 30px !important;
         right: 30px !important;
         z-index: 999999 !important;
     }}
-    
-    /* Override the actual button inside the container */
     div.st-key-daybot_avatar_btn button {{
         width: 85px !important;
         height: 85px !important;
@@ -59,55 +63,120 @@ def render_floating_chat():
         background-position: center top !important;
         background-repeat: no-repeat !important;
         border: 4px solid #4ECDC4 !important;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important;
         color: transparent !important;
-        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+        transition: transform 0.2s ease, border-color 0.2s ease !important;
         padding: 0 !important;
-        cursor: pointer !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
     }}
     div.st-key-daybot_avatar_btn button:hover {{
-        transform: scale(1.08) !important;
-        box-shadow: 0 12px 32px rgba(0,0,0,0.4) !important;
+        transform: scale(1.1) rotate(5deg) !important;
         border-color: #6C63FF !important;
-        color: transparent !important;
     }}
-    
-    /* Hide all inner Streamlit text nodes like <p> */
-    div.st-key-daybot_avatar_btn button * {{
-        display: none !important;
-        color: transparent !important;
-    }}
+    div.st-key-daybot_avatar_btn button p {{ display: none !important; }}
 
-    /* Float the Chat Panel */
-    div[data-testid="stVerticalBlock"]:has(#daybot-chat-panel) {{
+    /* 2. Premium Glassmorphic Chat Panel */
+    .floating-daybot-panel {{
         position: fixed !important;
-        bottom: 115px !important;
+        bottom: 130px !important;
         right: 30px !important;
-        width: 380px !important;
-        height: 520px !important;
-        background: linear-gradient(160deg, #13162a, #0f111c) !important;
-        border: 1px solid rgba(108,99,255,0.3) !important;
-        border-radius: 20px !important;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.5) !important;
-        padding: 16px !important;
+        width: 400px !important;
+        height: 580px !important;
+        background: rgba(15, 18, 59, 0.85) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 24px !important;
+        box-shadow: 0 32px 100px rgba(0,0,0,0.9) !important;
         z-index: 999998 !important;
-        overflow-y: hidden !important;
-        display: flex !important;
-        flex-direction: column !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     }}
 
-    .daybot-header {{
-        background: linear-gradient(135deg, #6C63FF, #4ECDC4);
-        padding: 12px 16px;
-        border-radius: 12px;
+    /* Remove Streamlit inner gaps */
+    .floating-daybot-panel > div {{
+        padding: 0 !important;
+        gap: 0 !important;
+    }}
+
+    /* 3. AI-Glow Header */
+    .daybot-premium-header {{
+        background: linear-gradient(135deg, #6C63FF 0%, #3B82F6 100%);
+        padding: 24px 20px;
         display: flex;
         align-items: center;
-        gap: 12px;
-        margin-bottom: 12px;
+        gap: 14px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }}
+    .ai-icon-glow {{
+        width: 44px;
+        height: 44px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 12px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 26px;
+        animation: pulseGlow 3s infinite ease-in-out;
+    }}
+
+    /* 4. Chat Bubbles Upgrade */
+    .chat-bubble-user {{
+        background: linear-gradient(135deg, #6C63FF 0%, #5146FF 100%);
+        color: white;
+        padding: 12px 18px;
+        border-radius: 20px 20px 4px 20px;
+        margin: 10px 0 10px auto;
+        max-width: 80%;
+        font-size: 14.5px;
+        line-height: 1.5;
+        box-shadow: 0 6px 16px rgba(108, 99, 255, 0.25);
+    }}
+    .chat-bubble-bot {{
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.08);
+        color: rgba(255,255,255,0.95);
+        padding: 12px 18px;
+        border-radius: 20px 20px 20px 4px;
+        margin: 10px auto 10px 0;
+        max-width: 80%;
+        font-size: 14.5px;
+        line-height: 1.5;
+    }}
+
+    /* 5. Personality Section Stying */
+    .personality-pills-container {{
+        padding: 12px 16px;
+        background: rgba(0,0,0,0.2);
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+    }}
+    
+    /* Target Streamlit buttons to look like segmented pills */
+    div[data-testid="column"] button {{
+        border: none !important;
+        background: transparent !important;
+        border-radius: 12px !important;
+        font-weight: 600 !important;
+        height: 36px !important;
+    }}
+    div[data-testid="column"] button:hover {{
+        background: rgba(255,255,255,0.05) !important;
+    }}
+
+    /* Bottom Input Area */
+    div.stForm {{
+        background: rgba(0,0,0,0.3) !important;
+        border-top: 1px solid rgba(255,255,255,0.08) !important;
+        padding: 12px 16px !important;
+    }}
+    div.stForm [data-testid="stVerticalBlock"] {{
+        gap: 0 !important;
     }}
     </style>
     """, unsafe_allow_html=True)
-
     # ── Floating Avatar Button ────────────────────────
     if st.button("Avatar", key="daybot_avatar_btn"):
         st.session_state.chat_open = not st.session_state.chat_open
@@ -115,72 +184,83 @@ def render_floating_chat():
 
     # ── Floating Chat Panel ───────────────────────────
     if st.session_state.chat_open:
-        chat_wrapper = st.container()
-        with chat_wrapper:
-            st.markdown('<div id="daybot-chat-panel"></div>', unsafe_allow_html=True)
+        panel_container = st.container()
+        with panel_container:
+            st.markdown('<div id="daybot-chat-container"></div>', unsafe_allow_html=True)
+            import streamlit.components.v1 as components
+            components.html("""
+                <script>
+                    const chatNode = window.parent.document.getElementById('daybot-chat-container');
+                    if (chatNode) {
+                        const panel = chatNode.closest('[data-testid="stVerticalBlock"]');
+                        if (panel) {
+                            panel.classList.add("floating-daybot-panel");
+                        }
+                    }
+                </script>
+            """, height=0, width=0)
             
-            # ── Chat Header ───────────────────────────────────
-            st.markdown("""
-            <div class="daybot-header">
-                <div style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.2);
-                    display:flex;align-items:center;justify-content:center;font-size:22px;">🤖</div>
-                <div>
-                    <div style="font-weight:700;color:white;font-size:16px;">DayBot</div>
-                    <div style="font-size:11px;color:rgba(255,255,255,0.8);display:flex;align-items:center;gap:5px;">
-                        <span style="width:8px;height:8px;border-radius:50%;background:#6effc7;display:inline-block;"></span>
-                        Online · Wellness AI
+            # Header with Close Button handling
+            head_col1, head_col2 = st.columns([5, 1])
+            with head_col1:
+                st.markdown("""
+                <div class="daybot-premium-header" style="border-radius: 24px 0 0 0;">
+                    <div class="ai-icon-glow">🤖</div>
+                    <div>
+                        <div style="font-weight:800; color:white; font-size:18px; letter-spacing:-0.5px;">DayBot AI</div>
+                        <div style="font-size:12px; color:rgba(255,255,255,0.6); font-weight:500;">Premium Wellness Coach</div>
                     </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+            with head_col2:
+                # Add a little top margin to the close button so it sits well in the header space
+                st.markdown("<div style='margin-top: 15px;'>", unsafe_allow_html=True)
+                if st.button("✖", key="close_chat_btn", help="Close Chat"):
+                    st.session_state.chat_open = False
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
-            # ── Personality Selector ──────────────────────────
-            pers_options = ["Friendly", "Professional", "Rude"]
-            current_idx = pers_options.index(st.session_state.chat_personality) \
-                if st.session_state.chat_personality in pers_options else 0
+            # Behavior / Personality Selection (Premium Pills layout)
+            st.markdown("<div style='padding: 8px 16px 4px 16px;'>", unsafe_allow_html=True)
+            pill_cols = st.columns(3)
+            options = ["Friendly", "Professional", "Rude"]
+            
+            for i, opt in enumerate(options):
+                with pill_cols[i]:
+                    is_active = (st.session_state.chat_personality == opt)
+                    if st.button(opt, key=f"btn_{opt}", use_container_width=True, type="primary" if is_active else "secondary"):
+                        st.session_state.chat_personality = opt
+                        st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
-            selected_pers = st.radio(
-                "Personality",
-                options=["😊 Friendly", "🧑‍💼 Professional", "😈 Rude"],
-                horizontal=True,
-                label_visibility="collapsed",
-                key="chat_personality_radio",
-                index=current_idx,
-            )
-            st.session_state.chat_personality = selected_pers.split(" ", 1)[1]
-
-            st.markdown("<hr style='margin: 8px 0; border-color: rgba(255,255,255,0.1);'>", unsafe_allow_html=True)
-
-            # ── Message History ───────────────────────────────
-            chat_box = st.container(height=260)
-            with chat_box:
+            # Chat History Container
+            history_col = st.container(height=240, border=False)
+            with history_col:
                 for msg in st.session_state.chat_history:
-                    role = "user" if msg["role"] == "user" else "assistant"
-                    with st.chat_message(role, avatar="🤖" if role == "assistant" else "👤"):
-                        st.write(msg["content"])
+                    if msg["role"] == "user":
+                        st.markdown(f'<div class="chat-bubble-user">{msg["content"]}</div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'<div class="chat-bubble-bot">{msg["content"]}</div>', unsafe_allow_html=True)
 
-            # ── Input Callback logic ──────────────────────────
-            def submit_chat():
-                user_msg = st.session_state.daybot_input_temp
-                if user_msg:
-                    st.session_state.chat_history.append({"role": "user", "content": user_msg})
-                    # Attempt backend generation
+            # Footer / Input
+            with st.form("daybot_chat_form", clear_on_submit=True, border=False):
+                col1, col2 = st.columns([5, 1])
+                with col1:
+                    prompt = st.text_input(
+                        "Message DayBot...",
+                        label_visibility="collapsed",
+                        placeholder="Ask about your health..."
+                    )
+                with col2:
+                    submitted = st.form_submit_button("➤")
+                    
+                if submitted and prompt:
+                    st.session_state.chat_history.append({"role": "user", "content": prompt})
                     try:
                         from features.chat.chat_logic import generate_response
-                        reply = generate_response(
-                            st.session_state.chat_history,
-                            st.session_state.chat_personality
-                        )
+                        ctx = st.session_state.get("fitness_data", {})
+                        reply = generate_response(st.session_state.chat_history, "Friendly", ctx)
+                        st.session_state.chat_history.append({"role": "bot", "content": reply})
                     except Exception as e:
-                        reply = f"Oops! Something went wrong. ({e})"
-                    st.session_state.chat_history.append({"role": "bot", "content": reply})
-                    # Clear the input
-                    st.session_state.daybot_input_temp = ""
-
-            st.text_input(
-                "Type a message...",
-                key="daybot_input_temp",
-                on_change=submit_chat,
-                placeholder="Ask DayBot anything...",
-                label_visibility="collapsed"
-            )
+                        st.session_state.chat_history.append({"role": "bot", "content": f"Error: {e}"})
+                    st.rerun()

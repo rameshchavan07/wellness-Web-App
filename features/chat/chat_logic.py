@@ -25,24 +25,41 @@ PERSONALITY_PROMPTS = {
     )
 }
 
-def generate_response(chat_history: list, personality: str) -> str:
+def generate_response(chat_history: list, personality: str, user_context: dict = None) -> str:
     """
-    Generates a response from OpenAI based on chat history and selected personality.
+    Generates a response from AI based on chat history, personality, and wellness context.
     """
-    api_key = os.environ.get("GROQ_API_KEY")
+    api_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    
+    # Build System Prompt with Context
+    base_prompt = PERSONALITY_PROMPTS.get(personality, PERSONALITY_PROMPTS["Friendly"])
+    if user_context:
+        context_str = "\n\nCURRENT USER DATA:\n"
+        context_str += f"- DayScore: {user_context.get('total_score', 'N/A')}/100\n"
+        context_str += f"- Steps Today: {user_context.get('steps', 0):,}\n"
+        context_str += f"- Sleep: {user_context.get('sleep', 0)} hours\n"
+        context_str += f"- Calories: {user_context.get('calories', 0)} kcal\n"
+        context_str += "Please use this data to give specific, personalized wellness advice."
+        system_prompt = base_prompt + context_str
+    else:
+        system_prompt = base_prompt
+
     if not api_key:
         # Fallback simulated response if no API key is present
-        time.sleep(1.5)  # Simulate network latency
-        return _simulate_response(chat_history[-1]["content"], personality)
+        time.sleep(1.0)
+        return _simulate_response(chat_history[-1]["content"], personality, user_context)
     
     try:
-        client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.groq.com/openai/v1"
-        )
-        
-        # Build the exact message list for the API
-        system_prompt = PERSONALITY_PROMPTS.get(personality, PERSONALITY_PROMPTS["Friendly"])
+        # Determine Provider (Groq or OpenAI)
+        if os.environ.get("GROQ_API_KEY"):
+            client = OpenAI(
+                api_key=os.environ.get("GROQ_API_KEY"),
+                base_url="https://api.groq.com/openai/v1"
+            )
+            model = "llama-3.1-8b-instant"
+        else:
+            client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            model = "gpt-3.5-turbo" # Default lightweight model
         
         messages = [{"role": "system", "content": system_prompt}]
         
@@ -56,10 +73,10 @@ def generate_response(chat_history: list, personality: str) -> str:
         
         # Make the API call
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # use a fast, free groq model
+            model=model,
             messages=messages,
             temperature=0.7,
-            max_tokens=250
+            max_tokens=300
         )
         
         return response.choices[0].message.content
@@ -68,10 +85,19 @@ def generate_response(chat_history: list, personality: str) -> str:
         return f"Oops! Having trouble connecting to my brain right now. ({str(e)})"
 
 
-def _simulate_response(user_text, personality):
-    """Fallback when no API key is configured."""
+def _simulate_response(user_text, personality, context=None):
+    """Fallback when no API key is configured with improved context awareness."""
     user_text = user_text.lower()
-    msg = "I'm currently in **Demo Mode** because no API key is connected. To make me smart and answer your questions, please add your `GROQ_API_KEY` or `OPENAI_API_KEY` to the `.env` file!"
+    
+    data_mention = ""
+    if context:
+        data_mention = f" I see your DayScore is **{context.get('total_score', 0)}** today."
+        if context.get('steps', 0) > 8000:
+            data_mention += " Great job on those steps! 🚶"
+        elif context.get('sleep', 0) < 6:
+            data_mention += " You look a bit tired, maybe get some extra rest? 😴"
+
+    msg = f"{data_mention}\n\nI'm currently in **Demo Mode** (no API key). To unlock my full AI potential, please add your `GROQ_API_KEY` or `OPENAI_API_KEY` to the `.env` file!"
     
     if personality == "Friendly":
         if "hello" in user_text or "hi" in user_text:
