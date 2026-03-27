@@ -4,9 +4,10 @@ Wellness chatbot powered by OpenAI API.
 """
 
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timezone
 from config.settings import OpenAIConfig
 from config.firebase_config import get_firestore_client
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 
 SYSTEM_PROMPT = """You are DayScore AI, a friendly and knowledgeable wellness assistant.
@@ -88,7 +89,7 @@ class ChatbotService:
                     "user_id": user_id,
                     "role": role,
                     "content": content,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 })
         except Exception:
             pass
@@ -99,7 +100,7 @@ class ChatbotService:
             if self.db:
                 docs = (
                     self.db.collection("chat_history")
-                    .where("user_id", "==", user_id)
+                    .where(filter=FieldFilter("user_id", "==", user_id))
                     .order_by("timestamp", direction="DESCENDING")
                     .limit(limit)
                     .stream()

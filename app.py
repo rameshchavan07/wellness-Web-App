@@ -11,6 +11,12 @@ from auth.auth_service import AuthService
 from auth.google_oauth import get_google_auth_url, handle_google_callback
 from utils.ui_components import inject_custom_css
 from services.google_fit_service import GoogleFitService
+from utils.session_manager import SessionManager
+
+# ── Global Initializations ────────────────────────────
+SessionManager.initialize()
+sm = SessionManager()
+
 
 # ── Page Configuration ─────────────────────────────────
 st.set_page_config(
@@ -34,14 +40,21 @@ def render_login_page():
         if google_callback_res.get("success"):
             sign_in_res = auth_service.sign_in_with_google(google_callback_res["user_info"])
             if sign_in_res["success"]:
-                st.session_state["authenticated"] = True
-                st.session_state["user"] = sign_in_res["user"]
-                st.session_state["token"] = sign_in_res.get("token", "")
+                sm.is_authenticated = True
+                sm.user = sign_in_res["user"]
+                sm.token = sign_in_res.get("token", "")
                 
-                # Store the Google Fit payload!
+                # Restore existing Google Fit payload from DB if available
+                if "google_fit_credentials" in sign_in_res["user"]:
+                    sm.google_fit_credentials = sign_in_res["user"]["google_fit_credentials"]
+                    sm.google_fit_connected = True
+
+                # Store the new Google Fit payload from callback!
                 if "raw_tokens" in google_callback_res:
-                    st.session_state["google_fit_credentials"] = google_callback_res["raw_tokens"]
-                    st.session_state["google_fit_connected"] = True
+                    tokens = google_callback_res["raw_tokens"]
+                    sm.google_fit_credentials = tokens
+                    sm.google_fit_connected = True
+                    auth_service.update_user_profile(sign_in_res["user"]["user_id"], {"google_fit_credentials": tokens})
                     
                 st.success("✅ Connected to Google & DayScore!")
                 st.rerun()
@@ -80,15 +93,21 @@ def render_login_page():
                 st.markdown("### 👋 Welcome Back")
                 email = st.text_input("Email", placeholder="you@example.com")
                 password = st.text_input("Password", type="password", placeholder="••••••••")
-                submitted = st.form_submit_button("🚀 Sign In", use_container_width=True)
+                submitted = st.form_submit_button("🚀 Sign In", width="stretch")
 
                 if submitted:
                     if email and password:
                         result = auth_service.sign_in(email, password)
                         if result["success"]:
-                            st.session_state["authenticated"] = True
-                            st.session_state["user"] = result["user"]
-                            st.session_state["token"] = result.get("token", "")
+                            sm.is_authenticated = True
+                            sm.user = result["user"]
+                            sm.token = result.get("token", "")
+
+                            # Restore Google Fit payload from DB if available
+                            if "google_fit_credentials" in result["user"]:
+                                sm.google_fit_credentials = result["user"]["google_fit_credentials"]
+                                sm.google_fit_connected = True
+                                
                             st.success("✅ Welcome back!")
                             st.rerun()
                         else:
@@ -103,7 +122,7 @@ def render_login_page():
                 email = st.text_input("Email", placeholder="you@example.com")
                 password = st.text_input("Password", type="password", placeholder="Min 6 characters")
                 confirm = st.text_input("Confirm Password", type="password", placeholder="••••••••")
-                submitted = st.form_submit_button("🎉 Create Account", use_container_width=True)
+                submitted = st.form_submit_button("🎉 Create Account", width="stretch")
 
                 if submitted:
                     if not name or not email or not password:
@@ -144,11 +163,11 @@ def render_login_page():
             'or</div>',
             unsafe_allow_html=True,
         )
-        if st.button("🎮 Try Demo Mode", use_container_width=True):
+        if st.button("🎮 Try Demo Mode", width="stretch"):
             demo_result = auth_service._demo_sign_in("demo@dayscore.app")
-            st.session_state["authenticated"] = True
-            st.session_state["user"] = demo_result["user"]
-            st.session_state["token"] = demo_result["token"]
+            sm.is_authenticated = True
+            sm.user = demo_result["user"]
+            sm.token = demo_result["token"]
             st.rerun()
 
     # Footer
@@ -159,13 +178,64 @@ def render_login_page():
     """, unsafe_allow_html=True)
 
 
-# ── Main App (authenticated) ──────────────────────────
-def render_main_app():
-    """Render the main application with sidebar navigation."""
-    user = st.session_state.get("user", {})
-    auth_service = AuthService()
+# ── Page Callables (Optimized Lazy Loading) ────────────
+def page_dashboard():
+    from features.dashboard import render_dashboard
+    render_dashboard()
 
-    # ── Sidebar ────────────────────────────────────────
+def page_results():
+    from features.results import render_results
+    render_results()
+
+def page_achievements():
+    from features.achievements import render_achievements
+    render_achievements()
+
+def page_challenges():
+    from features.challenges import render_challenges
+    render_challenges()
+
+def page_journal():
+    from features.journal import render_journal
+    render_journal()
+
+def page_mental_health():
+    from features.mental_health import render_mental_health
+    render_mental_health()
+
+def page_counselor():
+    from features.counselor import render_counselor
+    render_counselor()
+
+def page_messages():
+    from features.messages import render_messages
+    render_messages()
+
+def page_wellness():
+    from features.wellness import render_wellness
+    render_wellness()
+
+def page_settings():
+    from features.settings import render_settings
+    render_settings()
+
+# Define Navigation Pages globally to avoid re-instantiation
+PAGES = [
+    st.Page(page_dashboard, title="Dashboard", icon="📊", default=True),
+    st.Page(page_results, title="Results", icon="📈"),
+    st.Page(page_achievements, title="Achievements", icon="🏆"),
+    st.Page(page_challenges, title="Challenges", icon="👥"),
+    st.Page(page_journal, title="Journal", icon="📓"),
+    st.Page(page_mental_health, title="Mental Health", icon="🧠"),
+    st.Page(page_counselor, title="Counselor", icon="🩺"),
+    st.Page(page_messages, title="Messages", icon="💬"),
+    st.Page(page_wellness, title="Wellness", icon="🧘"),
+    st.Page(page_settings, title="Settings", icon="⚙️"),
+]
+
+# ── Sidebar Components ─────────────────────────────────
+def render_sidebar_header(user):
+    """Render common sidebar elements once."""
     with st.sidebar:
         # Branding
         st.markdown("""
@@ -191,39 +261,18 @@ def render_main_app():
         </div>
         """, unsafe_allow_html=True)
 
-        # Navigation — reliable st.button approach
+def render_sidebar_footer():
+    """Render logout and status at bottom of sidebar."""
+    auth_service = AuthService()
+    with st.sidebar:
         st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
-
-        NAV_PAGES = [
-            ("Dashboard",    "📊"),
-            ("Results",      "📈"),
-            ("Achievements", "🏆"),
-            ("Challenges",   "👥"),
-            ("Messages",     "💬"),
-            ("Wellness",     "🧘"),
-            ("Settings",     "⚙️"),
-        ]
-
-        if "selected_page" not in st.session_state:
-            st.session_state.selected_page = "Dashboard"
-
-        for page_name, icon in NAV_PAGES:
-            is_active = st.session_state.selected_page == page_name
-            btn_type = "primary" if is_active else "secondary"
-            
-            if st.button(f"{icon}  {page_name}", key=f"nav_{page_name}", use_container_width=True, type=btn_type):
-                st.session_state.selected_page = page_name
-                st.rerun()
-
-        selected = st.session_state.selected_page
-
         st.markdown("---")
-        if st.button("🚪 Sign Out", use_container_width=True):
+        if st.button("🚪 Sign Out", width="stretch"):
             auth_service.sign_out()
             st.rerun()
 
         # Google Fit status
-        fit_status = "🟢 Connected" if st.session_state.get("google_fit_connected") else "🔴 Not Connected"
+        fit_status = "🟢 Connected" if sm.google_fit_connected else "🔴 Not Connected"
         st.markdown(f"""
         <div style="text-align:center; margin-top:8px;">
             <span style="font-size:12px; color:rgba(255,255,255,0.3);">
@@ -232,54 +281,44 @@ def render_main_app():
         </div>
         """, unsafe_allow_html=True)
 
-        # Chat toggle button removed from sidebar; it's now a global floating avatar
+# ── Main App (authenticated) ──────────────────────────
+def render_main_app():
+    """Render the main application with optimized st.navigation."""
+    user = sm.user
+    
+    # Instantiate navigation once per script run
+    pg = st.navigation(PAGES)
 
-    # ── Page Router ────────────────────────────────────
+    # Render Header (Above Nav)
+    render_sidebar_header(user)
+
+    # Run Current Page
     try:
-        if selected == "Dashboard":
-            from features.dashboard import render_dashboard
-            render_dashboard()
-        elif selected == "Results":
-            from features.results import render_results
-            render_results()
-        elif selected == "Achievements":
-            from features.achievements import render_achievements
-            render_achievements()
-        elif selected == "Challenges":
-            from features.challenges import render_challenges
-            render_challenges()
-        elif selected == "Messages":
-            from features.messages import render_messages
-            render_messages()
-        elif selected == "Wellness":
-            from features.wellness import render_wellness
-            render_wellness()
-        elif selected == "Settings":
-            from features.settings import render_settings
-            render_settings()
+        pg.run()
     except Exception as page_err:
         import traceback
+        print("Page Error:", traceback.format_exc())
         if AppConfig.DEBUG:
             st.error(f"🚨 Page error: {page_err}")
             st.code(traceback.format_exc())
         else:
-            st.error("🚨 An unexpected error occurred while loading this page.")
+            st.error(f"🚨 An unexpected error occurred while loading this page.")
 
-    # ── Global Floating Chat ───────────────────────────
+    # Render Footer (Below Nav)
+    render_sidebar_footer()
+
+    # floating chat
     try:
         from features.chat.chat_ui import render_floating_chat
         render_floating_chat()
     except Exception as e:
-        import traceback
-        print("[DayBot ERROR]", traceback.format_exc())
-
-
+        pass
 # ── Global Callback Handlers ───────────────────────────
 # Note: Google Fit callback is now unified with handle_google_callback() inside render_login_page.
 
 # ── Entry Point ────────────────────────────────────────
 def main():
-    if st.session_state.get("authenticated"):
+    if sm.is_authenticated:
         render_main_app()
     else:
         render_login_page()

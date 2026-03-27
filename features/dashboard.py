@@ -4,7 +4,7 @@ Main dashboard page with DayScore gauge, metrics, and weekly trends.
 """
 
 import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from config.firebase_config import get_firestore_client
 
 from services.scoring_service import ScoringService
@@ -26,11 +26,15 @@ from utils.helpers import (
     generate_weekly_demo_scores,
 )
 from config.settings import AppConfig
+from utils.session_manager import SessionManager
 import html
+from concurrent.futures import ThreadPoolExecutor
+
+sm = SessionManager()
 
 def render_dashboard():
     """Render the main dashboard page."""
-    user = st.session_state.get("user", {})
+    user = sm.user
     user_name = html.escape(user.get("name", "User"))
     user_id = user.get("user_id", AppConfig.DEMO_USER_ID)
 
@@ -50,23 +54,21 @@ def render_dashboard():
     """, unsafe_allow_html=True)
 
     # ── Interactive Morning Check-in ───────────────────
-    if "mood_logged" not in st.session_state:
-        st.session_state.mood_logged = False
-        
+    if not sm.mood_logged:
         # Check Firebase to see if the user already logged a mood today
         db = get_firestore_client()
-        today_str = datetime.utcnow().strftime("%Y-%m-%d")
+        today_str = datetime.now().strftime("%Y-%m-%d")
         if db and user_id != AppConfig.DEMO_USER_ID:
             try:
                 doc = db.collection("users").document(user_id).collection("daily_logs").document(today_str).get()
                 if doc.exists:
                     data = doc.to_dict()
                     if "mood" in data:
-                        st.session_state.mood_logged = data["mood"]
+                        sm.mood_logged = data["mood"]
             except Exception:
                 pass
         
-    if not st.session_state.mood_logged:
+    if not sm.mood_logged:
         st.markdown("""
         <div class="metric-card" style="margin-bottom:24px; text-align:center; background:rgba(108,99,255,0.15);">
             <h3 style="margin-top:0;">Good morning! How are you feeling today?</h3>
@@ -76,62 +78,83 @@ def render_dashboard():
         emojis = [("🤩", "Great"), ("😊", "Good"), ("😐", "Okay"), ("😞", "Rough")]
         for i, (emoji, label) in enumerate(emojis):
             with cols[i]:
-                if st.button(f"{emoji} {label}", use_container_width=True, key=f"mood_{i}"):
-                    st.session_state.mood_logged = emoji
+                if st.button(f"{emoji} {label}", width="stretch", key=f"mood_{i}"):
+                    sm.mood_logged = emoji
                     st.rerun()
     else:
         st.markdown(f"""
         <div class="metric-card" style="margin-bottom:24px; display:flex; justify-content:space-between; align-items:center;">
-            <div><span style="font-size:24px;">{st.session_state.mood_logged}</span> <strong>Mood Logged</strong></div>
+            <div><span style="font-size:24px;">{sm.mood_logged}</span> <strong>Mood Logged</strong></div>
             <div style="color:#4ECDC4; font-weight:600;">+50 Bonus Points!</div>
         </div>
         """, unsafe_allow_html=True)
 
-    # ── Fetch Data ─────────────────────────────────────
+    # ── Fetch Data (Parallel) ──────────────────────────
     fit_service = GoogleFitService()
     scoring_service = ScoringService()
     streak_service = StreakService()
     achievement_service = AchievementService()
     notification_service = NotificationService()
+    from services.prediction_service import PredictionService
+    pred_service = PredictionService()
 
-    google_creds = st.session_state.get("google_fit_credentials", {})
+    google_creds = sm.google_fit_credentials
     
-    # Cache fitness data to prevent dashboard UI shuffle on chat toggle/pagereruns 
-    if "dashboard_fitness_data" not in st.session_state:
-        st.session_state.dashboard_fitness_data = fit_service.fetch_daily_data(google_creds)
-        
-    fitness_data = st.session_state.dashboard_fitness_data
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        # Fit data
+        if not sm.dashboard_fitness_data:
+            future_fit = executor.submit(fit_service.fetch_daily_data, google_creds)
+        else:
+            future_fit = None
 
+        # Streak
+        future_streak = executor.submit(streak_service.update_streak, user_id)
+
+        # Prediction
+        if not st.session_state.get("dashboard_prediction"):
+            future_pred = executor.submit(pred_service.predict_tomorrow, user_id)
+        else:
+            future_pred = None
+
+        # Gather results
+        if future_fit:
+            sm.dashboard_fitness_data = future_fit.result()
+        
+        fitness_data = sm.dashboard_fitness_data
+        streak = future_streak.result()
+        
+        if future_pred:
+            st.session_state.dashboard_prediction = future_pred.result()
+        
+        prediction = st.session_state.dashboard_prediction
+
+    # Calculate Score
     score_result = scoring_service.calculate_score(fitness_data)
     total_score = score_result["total_score"]
     grade = score_result["grade"]
     breakdown = score_result["breakdown"]
     message = score_result["message"]
 
-    if st.session_state.get("mood_logged"):
+    if sm.mood_logged:
         total_score += 50
         
-    # Save historical snapshot to Firestore
+    # Save historical snapshot to Firestore (Sync)
     if user_id != AppConfig.DEMO_USER_ID:
-        # Save mood if configured
-        if st.session_state.get("mood_logged"):
+        if sm.mood_logged:
             db = get_firestore_client()
             if db:
                 try:
-                    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+                    today_str = datetime.now().strftime("%Y-%m-%d")
                     db.collection("users").document(user_id).collection("daily_logs").document(today_str).set(
-                        {"mood": st.session_state.mood_logged, "date": today_str}, merge=True
+                        {"mood": sm.mood_logged, "date": today_str}, merge=True
                     )
                 except Exception:
                     pass
         
-        # Trigger permanent daily score background sync
-        # Uses st.session_state variables so we don't block the UI rendering if it's slightly slow.
         if google_creds:
             fit_service.sync_daily_data_to_firestore(user_id, google_creds)
 
-    # Update streak
-    streak = streak_service.update_streak(user_id)
+    # Post-parallel updates
     sleep_streak = streak_service.update_sleep_streak(user_id, fitness_data.get("sleep", 0))
 
     # Check achievements
@@ -158,7 +181,7 @@ def render_dashboard():
     with col1:
         st.plotly_chart(
             render_score_gauge(total_score, grade),
-            use_container_width=True,
+            width="stretch",
             config={"displayModeBar": False},
         )
         # Motivational message
@@ -257,7 +280,7 @@ def render_dashboard():
             data=scorecard,
             file_name="dayscore_instagram.png",
             mime="image/png",
-            use_container_width=True,
+            width="stretch",
             type="primary"
         )
 
@@ -270,7 +293,7 @@ def render_dashboard():
     with col_a:
         st.plotly_chart(
             render_breakdown_chart(breakdown),
-            use_container_width=True,
+            width="stretch",
             config={"displayModeBar": False},
         )
 
@@ -300,7 +323,7 @@ def render_dashboard():
                 log_dict = {doc.to_dict().get("date"): doc.to_dict().get("total_score", 0) for doc in logs}
                 
                 for i in range(7):
-                    date_str = (datetime.utcnow() - timedelta(days=6-i)).strftime("%Y-%m-%d")
+                    date_str = (datetime.now(timezone.utc) - timedelta(days=6-i)).strftime("%Y-%m-%d")
                     weekly_scores[i] = log_dict.get(date_str, 0)
             except Exception as e:
                 weekly_scores = generate_weekly_demo_scores()
@@ -314,7 +337,7 @@ def render_dashboard():
 
     st.plotly_chart(
         render_weekly_chart(weekly_scores, day_labels),
-        use_container_width=True,
+        width="stretch",
         config={"displayModeBar": False},
     )
 

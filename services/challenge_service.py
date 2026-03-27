@@ -3,9 +3,10 @@ DayScore - Challenge Service
 Manages community challenges and leaderboard.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 import streamlit as st
 from config.firebase_config import get_firestore_client
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 
 class ChallengeService:
@@ -34,7 +35,7 @@ class ChallengeService:
             "metric": challenge_data.get("metric", "steps"),  # steps, calories, score
             "duration_days": challenge_data.get("duration_days", 7),
             "participants": [creator_id],
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "status": "active",
         }
         try:
@@ -81,7 +82,7 @@ class ChallengeService:
             if self.db:
                 docs = (
                     self.db.collection("challenges")
-                    .where("status", "==", "active")
+                    .where(filter=FieldFilter("status", "==", "active"))
                     .stream()
                 )
                 challenges = []
@@ -101,7 +102,7 @@ class ChallengeService:
             if self.db:
                 query = self.db.collection("leaderboard")
                 if challenge_id:
-                    query = query.where("challenge_id", "==", challenge_id)
+                    query = query.where(filter=FieldFilter("challenge_id", "==", challenge_id))
                 query = query.order_by("score", direction="DESCENDING").limit(20)
                 return [doc.to_dict() for doc in query.stream()]
             else:
@@ -115,7 +116,7 @@ class ChallengeService:
             "user_id": user_id,
             "user_name": user_name,
             "score": score,
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         if challenge_id:
             entry["challenge_id"] = challenge_id

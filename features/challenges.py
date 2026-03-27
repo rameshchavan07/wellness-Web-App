@@ -93,7 +93,7 @@ def render_challenges():
 
             duration = st.slider("Duration (days)", 1, 30, 7)
 
-            submitted = st.form_submit_button("🚀 Create Challenge", use_container_width=True)
+            submitted = st.form_submit_button("🚀 Create Challenge", width="stretch")
 
             if submitted and name:
                 challenge_data = {

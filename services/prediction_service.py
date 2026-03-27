@@ -9,7 +9,8 @@ import numpy as np
 from sklearn.linear_model import Ridge
 from sklearn.preprocessing import StandardScaler
 from config.firebase_config import get_firestore_client
-from datetime import datetime, timedelta
+from google.cloud.firestore_v1.base_query import FieldFilter
+from datetime import datetime, timedelta, timezone
 
 class PredictionService:
     """Provides ML forecasting for DayScore metrics."""
@@ -24,10 +25,10 @@ class PredictionService:
             return self._generate_demo_history(days)
 
         try:
-            cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
             docs = self.db.collection("daily_scores")\
-                        .where("user_id", "==", user_id)\
-                        .where("timestamp", ">=", cutoff)\
+                        .where(filter=FieldFilter("user_id", "==", user_id))\
+                        .where(filter=FieldFilter("timestamp", ">=", cutoff))\
                         .order_by("timestamp", direction="ASCENDING")\
                         .get()
             
@@ -120,7 +121,7 @@ class PredictionService:
         import random
         history = []
         for i in range(days, 0, -1):
-            dt = datetime.utcnow() - timedelta(days=i)
+            dt = datetime.now(timezone.utc) - timedelta(days=i)
             steps = random.randint(4000, 12000)
             sleep = random.uniform(5.0, 8.5)
             cal = random.randint(1500, 2500)

@@ -4,7 +4,7 @@ Handles sending and receiving direct messages between users
 via Firebase Firestore.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from config.firebase_config import get_firestore_client
 from config.settings import AppConfig
 
@@ -40,7 +40,7 @@ class MessagingService:
             return True # Pretend success for demo
 
         try:
-            timestamp = datetime.utcnow().isoformat()
+            timestamp = datetime.now(timezone.utc).isoformat()
             
             # create a unique compound ID for the conversation room
             sorted_ids = sorted([sender_id, receiver_id])
@@ -99,11 +99,11 @@ class MessagingService:
             {
                 "sender_id": ("demo_alice" if u1.startswith("demo_google") or u1 == AppConfig.DEMO_USER_ID else u1),
                 "text": "Hey! How is your step count looking today?",
-                "timestamp": (datetime.utcnow() - timedelta(hours=2)).isoformat()
+                "timestamp": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
             },
             {
                 "sender_id": ("demo_alice" if u1.startswith("demo_google") or u1 == AppConfig.DEMO_USER_ID else u1),
                 "text": "I'm trying to hit 10k but only at 4k so far 🏃‍♀️",
-                "timestamp": (datetime.utcnow() - timedelta(hours=1.9)).isoformat()
+                "timestamp": (datetime.now(timezone.utc) - timedelta(hours=1.9)).isoformat()
             }
         ]

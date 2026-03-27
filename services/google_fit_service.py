@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import requests
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from concurrent.futures import ThreadPoolExecutor
 
 from config.settings import GoogleFitConfig
 from config.firebase_config import get_firestore_client
@@ -91,10 +92,16 @@ def _cached_fetch_daily_stats(token: str, refresh_token: str, client_id: str, cl
             pass
         return 0.0
 
-    steps = _get_int("com.google.step_count.delta")
-    calories = _get_float("com.google.calories.expended")
-    sleep = _get_sleep()
-    heart_rate = _get_float("com.google.heart_rate.bpm")
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        f_steps = executor.submit(_get_int, "com.google.step_count.delta")
+        f_calories = executor.submit(_get_float, "com.google.calories.expended")
+        f_sleep = executor.submit(_get_sleep)
+        f_heart = executor.submit(_get_float, "com.google.heart_rate.bpm")
+        
+        steps = f_steps.result()
+        calories = f_calories.result()
+        sleep = f_sleep.result()
+        heart_rate = f_heart.result()
 
     return {
         "steps": steps,
@@ -171,7 +178,7 @@ class GoogleFitService:
             return self._generate_demo_data()
 
         try:
-            target_date = date or datetime.utcnow()
+            target_date = date or datetime.now()
             target_timestamp = target_date.timestamp()
             
             return _cached_fetch_daily_stats(
@@ -186,50 +193,55 @@ class GoogleFitService:
             return self._generate_demo_data()
 
     def fetch_weekly_data(self, credentials_dict: dict) -> list:
-        """Fetch fitness data for the past 7 days."""
-        weekly = []
-        for i in range(6, -1, -1):
-            day = datetime.utcnow() - timedelta(days=i)
-            data = self.fetch_daily_data(credentials_dict, day)
-            weekly.append(data)
-        return weekly
+        """Fetch fitness data for the past 7 days in parallel."""
+        from concurrent.futures import ThreadPoolExecutor
+        days = [datetime.now() - timedelta(days=i) for i in range(6, -1, -1)]
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            results = list(executor.map(
+                lambda d: self.fetch_daily_data(credentials_dict, d), days
+            ))
+        return results
 
     def sync_daily_data_to_firestore(self, user_id: str, credentials_dict: dict, date: datetime = None):
         """
-        Fetch daily data, calculate DayScore, and sync purely to Firestore. 
-        Creates a permanent historical record in 'daily_scores' collection.
+        Fetch weekly data, calculate DayScore, and sync purely to Firestore. 
+        Creates a permanent historical record in 'daily_scores' collection for the last 7 days
+        so no days are missed if the user doesn't log in daily.
         """
         if not self.db or not credentials_dict:
             return
 
-        target_date = date or datetime.utcnow()
-        date_str = target_date.strftime("%Y-%m-%d")
-
-        # Fetch Data
-        daily_stats = self.fetch_daily_data(credentials_dict, target_date)
+        # Fetch the last 7 days of data
+        weekly_stats = self.fetch_weekly_data(credentials_dict)
         
-        # Calculate Score
-        score_data = self.scoring_service.calculate_score(daily_stats)
-        
-        # Build document payload
-        doc_data = {
-            "user_id": user_id,
-            "date": date_str,
-            "timestamp": target_date.isoformat(),
-            "steps": daily_stats.get("steps", 0),
-            "calories": daily_stats.get("calories", 0),
-            "sleep": daily_stats.get("sleep", 0.0),
-            "heart_rate": daily_stats.get("heart_rate", 0),
-            "day_score": score_data.get("total_score", 0),
-            "score_breakdown": score_data.get("components", {})
-        }
+        for daily_stats in weekly_stats:
+            date_str = daily_stats.get("date")
+            if not date_str:
+                continue
+                
+            # Calculate Score
+            score_data = self.scoring_service.calculate_score(daily_stats)
+            
+            # Build document payload
+            doc_data = {
+                "user_id": user_id,
+                "date": date_str,
+                "timestamp": datetime.now().isoformat(),
+                "steps": daily_stats.get("steps", 0),
+                "calories": daily_stats.get("calories", 0),
+                "sleep": daily_stats.get("sleep", 0.0),
+                "heart_rate": daily_stats.get("heart_rate", 0),
+                "day_score": score_data.get("total_score", 0),
+                "score_breakdown": score_data.get("breakdown", {})
+            }
 
-        # Write to daily_scores collection (upsert based on user_id + date)
-        try:
-            doc_id = f"{user_id}_{date_str}"
-            self.db.collection("daily_scores").document(doc_id).set(doc_data)
-        except Exception as e:
-            print(f"Failed to sync daily score to Firestore: {e}")
+            # Write to daily_scores collection (upsert based on user_id + date)
+            try:
+                doc_id = f"{user_id}_{date_str}"
+                self.db.collection("daily_scores").document(doc_id).set(doc_data)
+            except Exception as e:
+                print(f"Failed to sync daily score to Firestore for {date_str}: {e}")
 
     # ── Demo Data ──────────────────────────────────────────────────
     @staticmethod
@@ -240,5 +252,5 @@ class GoogleFitService:
             "calories": random.randint(1200, 2800),
             "sleep": round(random.uniform(4.5, 9.5), 1),
             "heart_rate": random.randint(55, 95),
-            "date": datetime.utcnow().strftime("%Y-%m-%d"),
+            "date": datetime.now().strftime("%Y-%m-%d"),
         }

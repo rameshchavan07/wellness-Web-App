@@ -6,11 +6,14 @@ User profile settings, Google Fit connection, and app preferences.
 import streamlit as st
 from services.google_fit_service import GoogleFitService
 from auth.auth_service import AuthService
+from utils.session_manager import SessionManager
+
+sm = SessionManager()
 
 
 def render_settings():
     """Render the Settings page."""
-    user = st.session_state.get("user", {})
+    user = sm.user
 
     st.markdown("""
     <h1 style="font-size:32px; font-weight:800; color:#FFD93D;">
@@ -69,16 +72,18 @@ def _render_profile(user: dict):
     st.markdown("---")
     with st.form("edit_profile"):
         new_name = st.text_input("Display Name", value=user.get("name", ""))
-        submitted = st.form_submit_button("💾 Update Profile", use_container_width=True)
+        submitted = st.form_submit_button("💾 Update Profile", width="stretch")
 
         if submitted and new_name:
             auth = AuthService()
             success = auth.update_user_profile(user.get("user_id", ""), {"name": new_name})
             if success:
-                st.session_state["user"]["name"] = new_name
+                user["name"] = new_name
+                sm.user = user
                 st.success("✅ Profile updated!")
             else:
-                st.session_state["user"]["name"] = new_name
+                user["name"] = new_name
+                sm.user = user
                 st.success("✅ Profile updated (local)!")
 
 
@@ -87,7 +92,7 @@ def _render_connections():
     st.markdown("### 🔗 Connected Services")
 
     # Google Fit
-    fit_connected = st.session_state.get("google_fit_connected", False)
+    fit_connected = sm.google_fit_connected
 
     st.markdown(f"""
     <div class="metric-card">
@@ -109,7 +114,7 @@ def _render_connections():
 
     if not fit_connected:
         fit_service = GoogleFitService()
-        user_id = st.session_state["user"].get("user_id", "demo")
+        user_id = sm.user.get("user_id", "demo")
         auth_url = fit_service.get_auth_url(user_id)
         if auth_url:
             st.markdown(f"[🔗 Connect Google Fit]({auth_url})")
@@ -117,8 +122,8 @@ def _render_connections():
             st.info("ℹ️ Configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env to enable Google Fit.")
     else:
         if st.button("🔌 Disconnect Google Fit"):
-            st.session_state["google_fit_connected"] = False
-            st.session_state.pop("google_fit_credentials", None)
+            sm.google_fit_connected = False
+            sm.google_fit_credentials = {}
             st.success("Disconnected from Google Fit.")
             st.rerun()
 

@@ -3,7 +3,7 @@ DayScore - Helper Utilities
 Common utility functions used across the app.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import random
 
 
@@ -29,7 +29,7 @@ def get_day_labels(days: int = 7) -> list:
     """Get day labels for the past N days."""
     labels = []
     for i in range(days - 1, -1, -1):
-        day = datetime.utcnow() - timedelta(days=i)
+        day = datetime.now(timezone.utc) - timedelta(days=i)
         labels.append(day.strftime("%a"))
     return labels
 
@@ -38,7 +38,7 @@ def get_date_labels(days: int = 7) -> list:
     """Get date labels for the past N days."""
     labels = []
     for i in range(days - 1, -1, -1):
-        day = datetime.utcnow() - timedelta(days=i)
+        day = datetime.now(timezone.utc) - timedelta(days=i)
         labels.append(day.strftime("%b %d"))
     return labels
 

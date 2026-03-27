@@ -3,9 +3,10 @@ DayScore - Achievement Service
 Tracks and awards user achievements / badges.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 import streamlit as st
 from config.firebase_config import get_firestore_client
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 
 # Achievement definitions
@@ -90,6 +91,30 @@ ACHIEVEMENTS = {
         "category": "score",
         "condition": lambda data: data.get("total_score", 0) >= 100,
     },
+    "journal_7": {
+        "id": "journal_7",
+        "name": "Reflective Soul",
+        "description": "Write journal entries for 7 consecutive days",
+        "icon": "📓",
+        "category": "mental_health",
+        "condition": lambda data: data.get("journal_streak", 0) >= 7,
+    },
+    "gratitude_guru": {
+        "id": "gratitude_guru",
+        "name": "Gratitude Guru",
+        "description": "Log gratitude 10 times",
+        "icon": "🙏",
+        "category": "mental_health",
+        "condition": lambda data: data.get("gratitude_count", 0) >= 10,
+    },
+    "mood_master": {
+        "id": "mood_master",
+        "name": "Mood Master",
+        "description": "Track your mood for 30 days",
+        "icon": "🧠",
+        "category": "mental_health",
+        "condition": lambda data: data.get("journal_entries_count", 0) >= 30,
+    },
 }
 
 
@@ -132,13 +157,14 @@ class AchievementService:
             if self.db:
                 docs = (
                     self.db.collection("achievements")
-                    .where("user_id", "==", user_id)
+                    .where(filter=FieldFilter("user_id", "==", user_id))
                     .stream()
                 )
                 return [doc.to_dict() for doc in docs]
             # Demo mode
             return st.session_state.get("demo_achievements", [])
-        except Exception:
+        except Exception as e:
+            st.warning(f"Could not fetch achievements: {e}")
             return st.session_state.get("demo_achievements", [])
 
     def _unlock_achievement(self, user_id: str, achievement: dict):
@@ -150,7 +176,7 @@ class AchievementService:
             "description": achievement["description"],
             "icon": achievement["icon"],
             "category": achievement["category"],
-            "unlocked_at": datetime.utcnow().isoformat(),
+            "unlocked_at": datetime.now(timezone.utc).isoformat(),
         }
         try:
             if self.db:

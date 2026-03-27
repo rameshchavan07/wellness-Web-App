@@ -1,27 +1,25 @@
 # Core
-streamlit
-python-dotenv
+streamlit>=1.40.0
+python-dotenv>=1.0.0
 
 # Firebase
-firebase-admin
+firebase-admin>=6.5.0
 
 # Google Fit
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
-google-api-python-client
+google-auth>=2.28.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.120.0
 
 # AI / ML
-openai
-scikit-learn
-numpy
-pandas
+openai>=1.12.0
+scikit-learn>=1.4.0
+numpy>=1.26.0
+pandas>=2.2.0
 
 # Visualization
-plotly
+plotly>=5.18.0
 
 # Utils
-requests
-Pillow
-streamlit-option-menu
-streamlit-autorefresh
+requests>=2.31.0
+Pillow>=10.2.0

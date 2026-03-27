@@ -7,7 +7,7 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 
 def get_secret(key: str, default: str = "") -> str:
@@ -94,3 +94,12 @@ class ScoringConfig:
         "heart_rate_min": 60,
         "heart_rate_max": 100,
     }
+
+
+class SMTPConfig:
+    """SMTP Email configuration."""
+    SERVER = get_secret("SMTP_SERVER", "smtp.gmail.com")
+    PORT = int(get_secret("SMTP_PORT", "587"))
+    USERNAME = get_secret("SMTP_USERNAME", "")
+    PASSWORD = get_secret("SMTP_PASSWORD", "")
+    FROM_EMAIL = get_secret("SMTP_FROM_EMAIL", USERNAME)

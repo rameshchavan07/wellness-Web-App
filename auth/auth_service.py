@@ -5,9 +5,11 @@ Uses Firebase Admin SDK with demo-mode fallback.
 """
 
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timezone
 
 from config.firebase_config import get_firestore_client, get_firebase_auth
+from utils.session_manager import SessionManager
+
 
 
 class AuthService:
@@ -32,7 +34,7 @@ class AuthService:
                     "name": display_name,
                     "email": email,
                     "profile_photo": user_record.photo_url or "",
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
                     "streak": 0,
                     "total_points": 0,
                     "last_active_date": "",
@@ -50,6 +52,8 @@ class AuthService:
                 return {"success": False, "error": "Email already registered."}
             elif "WEAK_PASSWORD" in error_msg or "at least 6" in error_msg.lower():
                 return {"success": False, "error": "Password must be at least 6 characters."}
+            elif any(k in error_msg for k in ("ConnectionPool", "RemoteDisconnected", "ProtocolError", "Max retries", "Connection aborted", "HTTPSConnectionPool")):
+                return {"success": False, "error": "⚠️ Cannot reach Firebase — check your internet connection and ensure Google APIs are not blocked by a firewall or proxy."}
             return {"success": False, "error": f"Registration failed: {error_msg}"}
 
     def sign_in_with_google(self, google_user_info: dict) -> dict:
@@ -83,7 +87,7 @@ class AuthService:
                     "profile_photo": picture,
                     "auth_provider": "google",
                     "google_id": google_id,
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
                     "streak": 0,
                     "total_points": 0,
                     "last_active_date": "",
@@ -102,6 +106,8 @@ class AuthService:
                         user_data["sleep_streak"] = existing.get("sleep_streak", 0)
                         user_data["last_active_date"] = existing.get("last_active_date", "")
                         user_data["created_at"] = existing.get("created_at", user_data["created_at"])
+                        if "google_fit_credentials" in existing:
+                            user_data["google_fit_credentials"] = existing["google_fit_credentials"]
                         doc_ref.set(user_data, merge=True)
                     else:
                         doc_ref.set(user_data)
@@ -156,6 +162,8 @@ class AuthService:
                         user_data["name"] = extra.get("name", user_data["name"])
                         user_data["streak"] = extra.get("streak", 0)
                         user_data["total_points"] = extra.get("total_points", 0)
+                        if "google_fit_credentials" in extra:
+                            user_data["google_fit_credentials"] = extra["google_fit_credentials"]
                 return {"success": True, "user": user_data, "token": auth_data.get("idToken", "admin_session")}
             else:
                 return self._demo_sign_in(email)
@@ -166,14 +174,8 @@ class AuthService:
             return {"success": False, "error": f"Login failed: {error_msg}"}
 
     def sign_out(self):
-        """Clear the session."""
-        keys_to_clear = [
-            "authenticated", "user", "token", "google_fit_connected",
-            "google_fit_credentials", "chat_history", "fitness_data",
-        ]
-        for key in keys_to_clear:
-            if key in st.session_state:
-                del st.session_state[key]
+        """Clear the session using SessionManager."""
+        SessionManager().clear()
 
     def get_user_profile(self, user_id: str) -> dict:
         """Retrieve user profile from Firestore."""
@@ -183,7 +185,8 @@ class AuthService:
                 if doc.exists:
                     return doc.to_dict()
             return {}
-        except Exception:
+        except Exception as e:
+            st.warning(f"Could not retrieve user profile: {e}")
             return {}
 
     def update_user_profile(self, user_id: str, data: dict) -> bool:
@@ -193,7 +196,8 @@ class AuthService:
                 self.db.collection("users").document(user_id).update(data)
                 return True
             return False
-        except Exception:
+        except Exception as e:
+            st.warning(f"Could not update user profile: {e}")
             return False
 
     # ── Demo Mode Helpers ──────────────────────────────
@@ -205,7 +209,7 @@ class AuthService:
             "name": name,
             "email": email,
             "profile_photo": "",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "streak": 0,
             "total_points": 0,
         }

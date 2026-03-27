@@ -3,7 +3,7 @@ DayScore - Streak Service
 Tracks daily usage streaks and sleep consistency streaks.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import streamlit as st
 from config.firebase_config import get_firestore_client
 
@@ -18,7 +18,7 @@ class StreakService:
         """
         Update user's daily streak. Returns the current streak count.
         """
-        today = datetime.utcnow().strftime("%Y-%m-%d")
+        today = datetime.now().strftime("%Y-%m-%d")
 
         try:
             if self.db:
@@ -30,7 +30,7 @@ class StreakService:
                     last_active = data.get("last_active_date", "")
                     streak = data.get("streak", 0)
 
-                    yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+                    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
                     if last_active == today:
                         return streak  # Already counted today
@@ -100,7 +100,7 @@ class StreakService:
     def _demo_update_streak(today: str) -> int:
         last = st.session_state.get("demo_last_active", "")
         streak = st.session_state.get("demo_streak", 0)
-        yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
         if last == today:
             return streak

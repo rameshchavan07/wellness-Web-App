@@ -9,6 +9,9 @@ import streamlit as st
 
 import base64
 import os
+from utils.session_manager import SessionManager
+
+sm = SessionManager()
 
 def render_chat_button_in_sidebar():
     pass  # We removed the sidebar button; the floating avatar will toggle it directly from the main view!
@@ -17,14 +20,12 @@ def render_chat_button_in_sidebar():
 def render_floating_chat():
     """Renders the chat popover panel using the Indian avatar floating button."""
 
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = [
+    if not sm.chat_history:
+        sm.chat_history = [
             {"role": "bot", "content": "Hi! I'm DayBot 👋 How can I help you today?"}
         ]
-    if "chat_personality" not in st.session_state:
-        st.session_state.chat_personality = "Friendly"
-    if "chat_open" not in st.session_state:
-        st.session_state.chat_open = False
+    
+    # sm.chat_personality and sm.chat_open are handles by SessionManager defaults/initialization
     # Read the avatar image robustly
     avatar_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "assets", "indian_avatar.png"))
     if os.path.exists(avatar_path):
@@ -228,7 +229,7 @@ def render_floating_chat():
             for i, opt in enumerate(options):
                 with pill_cols[i]:
                     is_active = (st.session_state.chat_personality == opt)
-                    if st.button(opt, key=f"btn_{opt}", use_container_width=True, type="primary" if is_active else "secondary"):
+                    if st.button(opt, key=f"btn_{opt}", width="stretch", type="primary" if is_active else "secondary"):
                         st.session_state.chat_personality = opt
                         st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)

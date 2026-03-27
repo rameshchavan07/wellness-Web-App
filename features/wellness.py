@@ -82,7 +82,7 @@ def _render_breathing_exercise():
         </div>
         """, unsafe_allow_html=True)
 
-    if st.button("🧘 Start Breathing Exercise", use_container_width=True):
+    if st.button("🧘 Start Breathing Exercise", width="stretch"):
         progress_bar = st.progress(0)
         status_text = st.empty()
         circle_display = st.empty()
@@ -188,7 +188,7 @@ def _reaction_game():
         st.session_state.reaction_times = []
 
     if st.session_state.reaction_state == "ready":
-        if st.button("🟡 Click to Start!", use_container_width=True):
+        if st.button("🟡 Click to Start!", width="stretch"):
             st.session_state.reaction_state = "waiting"
             st.session_state.reaction_start = time.time() + random.uniform(1, 4)
             st.rerun()
@@ -205,7 +205,7 @@ def _reaction_game():
             st.rerun()
 
     elif st.session_state.reaction_state == "go":
-        if st.button("🟢 CLICK NOW!", use_container_width=True):
+        if st.button("🟢 CLICK NOW!", width="stretch"):
             reaction_time = int((time.time() - st.session_state.reaction_go_time) * 1000)
             st.session_state.reaction_times.append(reaction_time)
 
@@ -244,7 +244,7 @@ def _memory_game():
 
     if st.session_state.memory_phase == "start":
         st.markdown(f"**Current Level:** {st.session_state.memory_round}")
-        if st.button("🎮 Start / Next Round", use_container_width=True):
+        if st.button("🎮 Start / Next Round", width="stretch"):
             st.session_state.memory_round += 1
             st.session_state.memory_sequence.append(random.choice(colors))
             st.session_state.memory_phase = "show"
@@ -261,7 +261,7 @@ def _memory_game():
         </div>
         """, unsafe_allow_html=True)
 
-        if st.button("✅ I memorized it!", use_container_width=True):
+        if st.button("✅ I memorized it!", width="stretch"):
             st.session_state.memory_phase = "input"
             st.rerun()
 
@@ -422,7 +422,7 @@ def _render_sounds():
     if "playing_sound" not in st.session_state:
         st.session_state.playing_sound = None
 
-    if st.button("▶️ Load & Play Sound", use_container_width=True):
+    if st.button("▶️ Load & Play Sound", width="stretch"):
         st.session_state.playing_sound = selected_sound
         st.rerun()
 
