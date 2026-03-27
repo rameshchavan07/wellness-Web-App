@@ -25,12 +25,13 @@ GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
-# Scopes needed for profile + email + fitness
+# Scopes for sign-in only (no sensitive Fit scopes — avoids 403 on Streamlit Cloud)
+# Google Fit scopes are requested separately via Settings → Connect Google Fit
 GOOGLE_SIGN_IN_SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
-] + GoogleFitConfig.SCOPES
+]
 
 # Temp dir for persisted CSRF tokens
 _CSRF_TOKEN_DIR = os.path.join(tempfile.gettempdir(), "dayscore_oauth")
