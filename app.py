@@ -98,7 +98,6 @@ def render_login_page():
                 st.markdown("### 👋 Welcome Back")
                 email = st.text_input("Email", placeholder="you@example.com")
                 password = st.text_input("Password", type="password", placeholder="••••••••")
-                is_counselor_login = st.checkbox("Login as Counselor")
                 submitted = st.form_submit_button("🚀 Sign In", width="stretch")
 
                 if submitted:
@@ -108,11 +107,6 @@ def render_login_page():
                             sm.is_authenticated = True
                             sm.user = result["user"]
                             sm.token = result.get("token", "")
-
-                            # If they checked the box, ensure their role is set to counselor
-                            if is_counselor_login and sm.user.get("role") != "counselor":
-                                sm.user["role"] = "counselor"
-                                auth_service.update_user_profile(sm.user["user_id"], {"role": "counselor"})
 
                             # Restore Google Fit payload from DB if available
                             if "google_fit_credentials" in result["user"]:
@@ -133,7 +127,6 @@ def render_login_page():
                 email = st.text_input("Email", placeholder="you@example.com")
                 password = st.text_input("Password", type="password", placeholder="Min 6 characters")
                 confirm = st.text_input("Confirm Password", type="password", placeholder="••••••••")
-                is_counselor_signup = st.checkbox("Sign up as Counselor")
                 submitted = st.form_submit_button("🎉 Create Account", width="stretch")
 
                 if submitted:
@@ -144,7 +137,7 @@ def render_login_page():
                     elif len(password) < 6:
                         st.error("Password must be at least 6 characters.")
                     else:
-                        result = auth_service.sign_up(email, password, name, is_counselor=is_counselor_signup)
+                        result = auth_service.sign_up(email, password, name)
                         if result["success"]:
                             sm.is_authenticated = True
                             sm.user = result["user"]
