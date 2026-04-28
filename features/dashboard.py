@@ -136,7 +136,7 @@ def render_dashboard():
     message = score_result["message"]
 
     if sm.mood_logged:
-        total_score += 50
+        total_score = min(total_score + 5, 100)  # Mood bonus (capped at 100)
         
     # Save historical snapshot to Firestore (Sync)
     if user_id != AppConfig.DEMO_USER_ID:
@@ -154,8 +154,12 @@ def render_dashboard():
         if google_creds:
             fit_service.sync_daily_data_to_firestore(user_id, google_creds)
 
-    # Post-parallel updates
-    sleep_streak = streak_service.update_sleep_streak(user_id, fitness_data.get("sleep", 0))
+    # Post-parallel updates (guard: only update sleep streak once per day)
+    if not st.session_state.get("_sleep_streak_updated_today"):
+        sleep_streak = streak_service.update_sleep_streak(user_id, fitness_data.get("sleep", 0))
+        st.session_state["_sleep_streak_updated_today"] = True
+    else:
+        sleep_streak = streak_service.get_sleep_streak(user_id) if hasattr(streak_service, 'get_sleep_streak') else st.session_state.get("demo_sleep_streak", 0)
 
     # Check achievements
     achievement_data = {
@@ -224,12 +228,7 @@ def render_dashboard():
         """, unsafe_allow_html=True)
 
     # ── AI Score Forecast ──────────────────────────────
-    if "dashboard_prediction" not in st.session_state:
-        from services.prediction_service import PredictionService
-        pred_service = PredictionService()
-        st.session_state.dashboard_prediction = pred_service.predict_tomorrow(user_id)
-        
-    prediction = st.session_state.dashboard_prediction
+    prediction = st.session_state.get("dashboard_prediction", {})
     
     if prediction.get("success"):
         st.markdown(f"""
@@ -315,7 +314,7 @@ def render_dashboard():
     
     if "dashboard_weekly_scores" not in st.session_state:
         weekly_scores = [0] * 7
-        db = get_firestore_client() # Ensure db client is available here
+        db = get_firestore_client()
         if db and user_id != AppConfig.DEMO_USER_ID:
             try:
                 # Fetch last 7 days from Firestore natively
@@ -325,12 +324,13 @@ def render_dashboard():
                 for i in range(7):
                     date_str = (datetime.now(timezone.utc) - timedelta(days=6-i)).strftime("%Y-%m-%d")
                     weekly_scores[i] = log_dict.get(date_str, 0)
-            except Exception as e:
+            except Exception:
                 weekly_scores = generate_weekly_demo_scores()
         else:
             weekly_scores = generate_weekly_demo_scores()
+        st.session_state["dashboard_weekly_scores"] = weekly_scores
     else:
-        weekly_scores = generate_weekly_demo_scores()
+        weekly_scores = st.session_state["dashboard_weekly_scores"]
 
     # Replace last day with today's actual score
     weekly_scores[-1] = total_score

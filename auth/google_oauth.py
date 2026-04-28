@@ -53,8 +53,24 @@ def _verify_and_consume_csrf_token(token: str) -> bool:
     """
     Check if the token matches a stored temp file.
     Deletes the file so each token is single-use.
+    Also cleans up any expired tokens (older than 10 minutes).
     Returns True if valid, False otherwise.
     """
+    import time
+    
+    # Cleanup expired tokens first
+    if os.path.exists(_CSRF_TOKEN_DIR):
+        current_time = time.time()
+        for filename in os.listdir(_CSRF_TOKEN_DIR):
+            if filename.startswith("csrf_") and filename.endswith(".tmp"):
+                filepath = os.path.join(_CSRF_TOKEN_DIR, filename)
+                try:
+                    # Delete files older than 10 minutes (600 seconds)
+                    if current_time - os.path.getmtime(filepath) > 600:
+                        os.remove(filepath)
+                except OSError:
+                    pass
+
     token_path = os.path.join(_CSRF_TOKEN_DIR, f"csrf_{token}.tmp")
     if os.path.exists(token_path):
         try:

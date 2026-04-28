@@ -132,10 +132,20 @@ class CounselorService:
 
     # ── Counselor Directory ────────────────────────────
 
-    @staticmethod
-    def get_counselors(specialty_filter: str | None = None) -> list:
-        """Get list of available counselors, optionally filtered by specialty."""
-        counselors = COUNSELOR_PROFILES
+    def get_counselors(self, specialty_filter: str | None = None) -> list:
+        """Get list of available counselors from Firestore, optionally filtered by specialty."""
+        counselors = []
+        try:
+            if self.db:
+                docs = self.db.collection("counselors").stream()
+                counselors = [doc.to_dict() for doc in docs]
+        except Exception:
+            pass
+
+        # Fallback to static list if Firestore fails or is empty
+        if not counselors:
+            counselors = COUNSELOR_PROFILES
+
         if specialty_filter and specialty_filter != "All":
             filter_str = str(specialty_filter).lower()
             counselors = [
@@ -145,17 +155,31 @@ class CounselorService:
             ]
         return counselors
 
-    @staticmethod
-    def get_counselor_by_id(counselor_id: str) -> dict:
-        """Get a specific counselor by ID."""
+    def get_counselor_by_id(self, counselor_id: str) -> dict:
+        """Get a specific counselor by ID from Firestore."""
+        try:
+            if self.db:
+                doc = self.db.collection("counselors").document(counselor_id).get()
+                if doc.exists:
+                    return doc.to_dict()
+        except Exception:
+            pass
+            
         for c in COUNSELOR_PROFILES:
-            if c["id"] == counselor_id:
+            if c.get("id") == counselor_id:
                 return c
         return {}
 
-    @staticmethod
-    def get_counselor_by_email(email: str) -> dict:
-        """Get a specific counselor by email."""
+    def get_counselor_by_email(self, email: str) -> dict:
+        """Get a specific counselor by email from Firestore."""
+        try:
+            if self.db:
+                docs = self.db.collection("counselors").where("email", "==", email).limit(1).stream()
+                for doc in docs:
+                    return doc.to_dict()
+        except Exception:
+            pass
+            
         for c in COUNSELOR_PROFILES:
             if c.get("email", "").lower() == email.lower():
                 return c
@@ -432,9 +456,10 @@ User context from DayScore app:
 
     @staticmethod
     def generate_meet_link() -> str:
-        """Generate a Google Meet-style meeting link."""
+        """Generate a working Jitsi Meet video call link."""
         code = uuid.uuid4().hex[:12]
-        return f"https://meet.google.com/{code[:3]}-{code[3:7]}-{code[7:11]}"
+        # Jitsi allows instant, free video calls without an API key
+        return f"https://meet.jit.si/DayScoreSession_{code}"
 
     # ── Demo Mode Helpers ──────────────────────────────
 

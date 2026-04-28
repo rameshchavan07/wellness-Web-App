@@ -19,8 +19,47 @@ class AuthService:
         self.db = get_firestore_client()
         self.auth = get_firebase_auth()
 
+    def _check_rate_limit(self, action: str, max_attempts: int = 5, window_minutes: int = 15) -> bool:
+        """Basic rate limiting using session state."""
+        try:
+            key = f"rate_limit_{action}"
+            if key not in st.session_state:
+                st.session_state[key] = {"attempts": 0, "first_attempt": datetime.now()}
+                
+            rate_info = st.session_state[key]
+            now = datetime.now()
+            
+            # Reset if window has passed
+            if (now - rate_info["first_attempt"]).total_seconds() > window_minutes * 60:
+                st.session_state[key] = {"attempts": 1, "first_attempt": now}
+                return True
+                
+            # Check attempts
+            if rate_info["attempts"] >= max_attempts:
+                return False
+                
+            # Increment
+            rate_info["attempts"] += 1
+            st.session_state[key] = rate_info
+            return True
+        except Exception:
+            return True  # Fail open if session state not available
+
     def sign_up(self, email: str, password: str, display_name: str, is_counselor: bool = False) -> dict:
         """Register a new user."""
+        import re
+        
+        if not self._check_rate_limit("signup"):
+            return {"success": False, "error": "Too many attempts. Please try again later."}
+            
+        # Input validation
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            return {"success": False, "error": "Invalid email format."}
+        if len(password) < 6:
+            return {"success": False, "error": "Password must be at least 6 characters."}
+        if len(display_name.strip()) < 2:
+            return {"success": False, "error": "Name must be at least 2 characters."}
+            
         try:
             if self.auth:
                 # Create user via Firebase Admin SDK
@@ -39,20 +78,25 @@ class AuthService:
                     "total_points": 0,
                     "last_active_date": "",
                     "sleep_streak": 0,
-                    "role": "counselor" if is_counselor else "patient"
+                    "role": "counselor" if is_counselor else "patient",
                 }
+                if is_counselor:
+                    user_data["counselor_id"] = user_record.uid
                 # Store in Firestore
                 if self.db:
                     self.db.collection("users").document(user_record.uid).set(user_data)
+                
+                # Reset rate limit on success
+                if "rate_limit_signup" in st.session_state:
+                    del st.session_state["rate_limit_signup"]
+                    
                 return {"success": True, "user": user_data, "token": "admin_session"}
             else:
-                return self._demo_sign_up(email, display_name)
+                return self._demo_sign_up(email, display_name, is_counselor)
         except Exception as e:
             error_msg = str(e)
             if "EMAIL_EXISTS" in error_msg or "already exists" in error_msg.lower():
                 return {"success": False, "error": "Email already registered."}
-            elif "WEAK_PASSWORD" in error_msg or "at least 6" in error_msg.lower():
-                return {"success": False, "error": "Password must be at least 6 characters."}
             elif any(k in error_msg for k in ("ConnectionPool", "RemoteDisconnected", "ProtocolError", "Max retries", "Connection aborted", "HTTPSConnectionPool")):
                 return {"success": False, "error": "⚠️ Cannot reach Firebase — check your internet connection and ensure Google APIs are not blocked by a firewall or proxy."}
             return {"success": False, "error": f"Registration failed: {error_msg}"}
@@ -128,6 +172,9 @@ class AuthService:
         import requests
         from config.settings import FirebaseConfig
         
+        if not self._check_rate_limit("login"):
+            return {"success": False, "error": "Too many attempts. Please try again later."}
+        
         try:
             if self.auth:
                 # Need API_KEY to verify password via REST API
@@ -168,13 +215,23 @@ class AuthService:
                             user_data["google_fit_credentials"] = extra["google_fit_credentials"]
                         if "role" in extra:
                             user_data["role"] = extra["role"]
+                        if "counselor_id" in extra:
+                            user_data["counselor_id"] = extra["counselor_id"]
                 
                 # Check for counselor role (legacy predefined counselors)
                 from services.counselor_service import CounselorService
-                counselor = CounselorService.get_counselor_by_email(email)
+                counselor = CounselorService().get_counselor_by_email(email)
                 if counselor:
                     user_data["role"] = "counselor"
                     user_data["counselor_id"] = counselor["id"]
+                
+                # Ensure counselor_id is set for any user with counselor role
+                if user_data.get("role") == "counselor" and "counselor_id" not in user_data:
+                    user_data["counselor_id"] = user_record.uid
+
+                # Reset rate limit on success
+                if "rate_limit_login" in st.session_state:
+                    del st.session_state["rate_limit_login"]
 
                 return {"success": True, "user": user_data, "token": auth_data.get("idToken", "admin_session")}
             else:
@@ -226,6 +283,8 @@ class AuthService:
             "total_points": 0,
             "role": "counselor" if is_counselor else "patient"
         }
+        if is_counselor:
+            user_data["counselor_id"] = user_data["user_id"]
         return {"success": True, "user": user_data, "token": "demo_token"}
 
     def _demo_sign_in(self, email: str) -> dict:
@@ -240,7 +299,7 @@ class AuthService:
 
         # Check for counselor role
         from services.counselor_service import CounselorService
-        counselor = CounselorService.get_counselor_by_email(email)
+        counselor = CounselorService().get_counselor_by_email(email)
         if counselor:
             user_data["name"] = counselor["name"]
             user_data["role"] = "counselor"

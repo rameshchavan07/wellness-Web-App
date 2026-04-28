@@ -105,10 +105,11 @@ def _cached_fetch_daily_stats(token: str, refresh_token: str, client_id: str, cl
         f_steps = executor.submit(_get_int, "com.google.step_count.delta", "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps")
         f_calories = executor.submit(_get_float, "com.google.calories.expended")
         f_heart = executor.submit(_get_float, "com.google.heart_rate.bpm")
+        f_sleep = executor.submit(_get_sleep)
         
         steps = f_steps.result()
         calories = f_calories.result()
-        sleep = 0.0  # Temporarily disabled due to missing scope
+        sleep = f_sleep.result()
         heart_rate = f_heart.result()
 
     return {
