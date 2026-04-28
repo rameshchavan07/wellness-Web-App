@@ -72,9 +72,9 @@ flowchart LR
     Services <--> DB
     Services <--> ML
     
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
-    classDef external fill:#fff3e0,stroke:#f57c00;
-    classDef data fill:#e1f5fe,stroke:#0288d1;
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#000;
+    classDef external fill:#fff3e0,stroke:#f57c00,color:#000;
+    classDef data fill:#e1f5fe,stroke:#0288d1,color:#000;
     
     class Fit,AI,Auth external;
     class DB,ML data;
@@ -114,10 +114,10 @@ flowchart TD
     %% Interaction
     Book -.->|Triggers Email & Link| View
     
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
-    classDef patient fill:#e1f5fe,stroke:#0288d1;
-    classDef counselor fill:#f3e5f5,stroke:#7b1fa2;
-    classDef system fill:#fff3e0,stroke:#f57c00;
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#000;
+    classDef patient fill:#e1f5fe,stroke:#0288d1,color:#000;
+    classDef counselor fill:#f3e5f5,stroke:#7b1fa2,color:#000;
+    classDef system fill:#fff3e0,stroke:#f57c00,color:#000;
     
     class Onboard,Dashboard,Sync,Score,Features,Journal,AI,Gamify,Book patient;
     class C_Dash,Manage,View,Video counselor;
