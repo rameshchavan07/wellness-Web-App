@@ -123,21 +123,42 @@ def render_login_page():
         else:
             with st.form("signup_form"):
                 st.markdown("### ✨ Create Your Account")
+                
+                # Role selection
+                is_counselor = st.checkbox("🩺 I am a Counselor/Doctor", value=False)
+                
                 name = st.text_input("Full Name", placeholder="John Doe")
                 email = st.text_input("Email", placeholder="you@example.com")
                 password = st.text_input("Password", type="password", placeholder="Min 6 characters")
                 confirm = st.text_input("Confirm Password", type="password", placeholder="••••••••")
+                
+                specialty = ""
+                clinic = ""
+                if is_counselor:
+                    st.markdown("##### Professional Details")
+                    specialty = st.text_input("Specialty", placeholder="e.g. Clinical Psychologist, Therapist")
+                    clinic = st.text_input("Hospital / Clinic Name", placeholder="e.g. Wellness Center")
+                
                 submitted = st.form_submit_button("🎉 Create Account", width="stretch")
 
                 if submitted:
                     if not name or not email or not password:
-                        st.warning("Please fill in all fields.")
+                        st.warning("Please fill in all required fields.")
+                    elif is_counselor and not specialty:
+                        st.warning("Counselors must provide a specialty.")
                     elif password != confirm:
                         st.error("Passwords do not match.")
                     elif len(password) < 6:
                         st.error("Password must be at least 6 characters.")
                     else:
-                        result = auth_service.sign_up(email, password, name)
+                        result = auth_service.sign_up(
+                            email=email, 
+                            password=password, 
+                            display_name=name, 
+                            is_counselor=is_counselor,
+                            specialty=specialty,
+                            clinic=clinic
+                        )
                         if result["success"]:
                             sm.is_authenticated = True
                             sm.user = result["user"]

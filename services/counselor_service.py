@@ -196,16 +196,15 @@ class CounselorService:
             return {"success": False, "error": "Counselor not found"}
 
         # Generate a unique meeting link
-        meet_code = uuid.uuid4().hex[:12]
-        meet_link = f"https://meet.google.com/{meet_code[:3]}-{meet_code[3:7]}-{meet_code[7:11]}"
+        meet_link = self.generate_meet_link()
 
         booking = {
             "id": str(uuid.uuid4())[:8],
             "user_id": user_id,
             "counselor_id": counselor_id,
-            "counselor_name": counselor["name"],
-            "counselor_title": counselor["title"],
-            "counselor_avatar": counselor["avatar"],
+            "counselor_name": counselor.get("name", "Unknown Counselor"),
+            "counselor_title": counselor.get("title", "Counselor"),
+            "counselor_avatar": counselor.get("avatar", "👨‍⚕️"),
             "session_date": session_date,
             "session_time": session_time,
             "session_type": session_type,

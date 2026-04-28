@@ -205,35 +205,35 @@ def _render_counselor_directory(user_id: str, service: CounselorService):
         <div class="metric-card" style="margin-bottom:12px;">
             <div style="display:flex; gap:16px; align-items:flex-start;">
                 <div style="font-size:48px; min-width:56px; text-align:center;">
-                    {counselor['avatar']}
+                    {counselor.get('avatar', '👨‍⚕️')}
                 </div>
                 <div style="flex:1;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
                             <div style="font-size:18px; font-weight:700; color:white;">
-                                {counselor['name']}
+                                {counselor.get('name', 'Unknown Counselor')}
                             </div>
                             <div style="color:#6C63FF; font-size:13px; font-weight:600;">
-                                {counselor['title']} • {counselor['experience']}
+                                {counselor.get('title', 'Counselor')} • {counselor.get('experience', 'New')}
                             </div>
                         </div>
                         <div style="text-align:right;">
                             <div style="color:#FFD93D; font-size:14px; font-weight:700;">
-                                ⭐ {counselor['rating']} <span style="color:rgba(255,255,255,0.4);
-                                font-weight:400; font-size:12px;">({counselor['reviews']})</span>
+                                ⭐ {counselor.get('rating', '5.0')} <span style="color:rgba(255,255,255,0.4);
+                                font-weight:400; font-size:12px;">({counselor.get('reviews', '0')})</span>
                             </div>
                             <div style="color:#4ECDC4; font-size:13px; font-weight:600;">
-                                {counselor['price']}
+                                {counselor.get('price', '$0 / session')}
                             </div>
                         </div>
                     </div>
                     <div style="color:rgba(255,255,255,0.6); font-size:13px; margin:8px 0;">
-                        {counselor['bio']}
+                        {counselor.get('bio', 'A new counselor on DayScore.')}
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
                         <div>{tags_html}</div>
                         <div style="color:rgba(255,255,255,0.5); font-size:12px;">
-                            🟢 {counselor['next_available']}
+                            🟢 {counselor.get('next_available', 'Available soon')}
                         </div>
                     </div>
                 </div>

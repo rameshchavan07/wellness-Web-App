@@ -45,7 +45,7 @@ class AuthService:
         except Exception:
             return True  # Fail open if session state not available
 
-    def sign_up(self, email: str, password: str, display_name: str, is_counselor: bool = False) -> dict:
+    def sign_up(self, email: str, password: str, display_name: str, is_counselor: bool = False, specialty: str = "", clinic: str = "") -> dict:
         """Register a new user."""
         import re
         
@@ -85,6 +85,20 @@ class AuthService:
                 # Store in Firestore
                 if self.db:
                     self.db.collection("users").document(user_record.uid).set(user_data)
+                    
+                    if is_counselor:
+                        counselor_profile = {
+                            "id": user_record.uid,
+                            "name": display_name,
+                            "specialty": specialty,
+                            "clinic": clinic,
+                            "email": email,
+                            "profile_photo": user_record.photo_url or "",
+                            "tags": [specialty.strip()] if specialty else [],
+                            "rating": 5.0,
+                            "reviews": 0
+                        }
+                        self.db.collection("counselors").document(user_record.uid).set(counselor_profile)
                 
                 # Reset rate limit on success
                 if "rate_limit_signup" in st.session_state:
@@ -92,7 +106,7 @@ class AuthService:
                     
                 return {"success": True, "user": user_data, "token": "admin_session"}
             else:
-                return self._demo_sign_up(email, display_name, is_counselor)
+                return self._demo_sign_up(email, display_name, is_counselor, specialty, clinic)
         except Exception as e:
             error_msg = str(e)
             if "EMAIL_EXISTS" in error_msg or "already exists" in error_msg.lower():
@@ -270,7 +284,7 @@ class AuthService:
             return False
 
     # ── Demo Mode Helpers ──────────────────────────────
-    def _demo_sign_up(self, email: str, name: str, is_counselor: bool = False) -> dict:
+    def _demo_sign_up(self, email: str, name: str, is_counselor: bool = False, specialty: str = "", clinic: str = "") -> dict:
         """Demo mode registration (no Firebase)."""
         from config.settings import AppConfig
         user_data = {
@@ -285,6 +299,8 @@ class AuthService:
         }
         if is_counselor:
             user_data["counselor_id"] = user_data["user_id"]
+            user_data["specialty"] = specialty
+            user_data["clinic"] = clinic
         return {"success": True, "user": user_data, "token": "demo_token"}
 
     def _demo_sign_in(self, email: str) -> dict:
