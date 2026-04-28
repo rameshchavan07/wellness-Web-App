@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import streamlit as st
 from config.firebase_config import get_firestore_client
 from google.cloud.firestore_v1.base_query import FieldFilter
+from config.settings import AppConfig
 
 
 class ChallengeService:
@@ -170,7 +171,6 @@ class ChallengeService:
 
     @staticmethod
     def _get_demo_leaderboard() -> list:
-        from config.settings import AppConfig
         return [
             {"user_id": "user_alice", "user_name": "Alice M.", "score": 92.5, "rank": 1},
             {"user_id": AppConfig.DEMO_USER_ID, "user_name": "You", "score": 85.0, "rank": 2},

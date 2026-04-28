@@ -25,12 +25,16 @@ GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
-# Scopes for sign-in only (no sensitive Fit scopes — avoids 403 on Streamlit Cloud)
-# Google Fit scopes are requested separately via Settings → Connect Google Fit
+# Scopes for sign-in AND Google Fit access in a single consent screen.
+# This avoids a second OAuth redirect for Fit-only scopes, which had no
+# callback handler and resulted in tokens without fitness permissions.
 GOOGLE_SIGN_IN_SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/fitness.activity.read",
+    "https://www.googleapis.com/auth/fitness.body.read",
+    "https://www.googleapis.com/auth/fitness.heart_rate.read",
 ]
 
 # Temp dir for persisted CSRF tokens

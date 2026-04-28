@@ -49,12 +49,17 @@ def render_login_page():
                     sm.google_fit_credentials = sign_in_res["user"]["google_fit_credentials"]
                     sm.google_fit_connected = True
 
-                # Store the new Google Fit payload from callback!
+                # Store the new Google Fit payload from callback ONLY if the
+                # token was granted fitness scopes (i.e. came from the Fit
+                # authorization flow, not the basic sign-in flow).
                 if "raw_tokens" in google_callback_res:
                     tokens = google_callback_res["raw_tokens"]
-                    sm.google_fit_credentials = tokens
-                    sm.google_fit_connected = True
-                    auth_service.update_user_profile(sign_in_res["user"]["user_id"], {"google_fit_credentials": tokens})
+                    granted_scopes = tokens.get("scopes", [])
+                    has_fitness_scope = any("fitness" in s for s in granted_scopes)
+                    if has_fitness_scope:
+                        sm.google_fit_credentials = tokens
+                        sm.google_fit_connected = True
+                        auth_service.update_user_profile(sign_in_res["user"]["user_id"], {"google_fit_credentials": tokens})
                     
                 st.success("✅ Connected to Google & DayScore!")
                 st.rerun()
@@ -93,6 +98,7 @@ def render_login_page():
                 st.markdown("### 👋 Welcome Back")
                 email = st.text_input("Email", placeholder="you@example.com")
                 password = st.text_input("Password", type="password", placeholder="••••••••")
+                is_counselor_login = st.checkbox("Login as Counselor")
                 submitted = st.form_submit_button("🚀 Sign In", width="stretch")
 
                 if submitted:
@@ -102,6 +108,11 @@ def render_login_page():
                             sm.is_authenticated = True
                             sm.user = result["user"]
                             sm.token = result.get("token", "")
+
+                            # If they checked the box, ensure their role is set to counselor
+                            if is_counselor_login and sm.user.get("role") != "counselor":
+                                sm.user["role"] = "counselor"
+                                auth_service.update_user_profile(sm.user["user_id"], {"role": "counselor"})
 
                             # Restore Google Fit payload from DB if available
                             if "google_fit_credentials" in result["user"]:
@@ -122,6 +133,7 @@ def render_login_page():
                 email = st.text_input("Email", placeholder="you@example.com")
                 password = st.text_input("Password", type="password", placeholder="Min 6 characters")
                 confirm = st.text_input("Confirm Password", type="password", placeholder="••••••••")
+                is_counselor_signup = st.checkbox("Sign up as Counselor")
                 submitted = st.form_submit_button("🎉 Create Account", width="stretch")
 
                 if submitted:
@@ -132,11 +144,11 @@ def render_login_page():
                     elif len(password) < 6:
                         st.error("Password must be at least 6 characters.")
                     else:
-                        result = auth_service.sign_up(email, password, name)
+                        result = auth_service.sign_up(email, password, name, is_counselor=is_counselor_signup)
                         if result["success"]:
-                            st.session_state["authenticated"] = True
-                            st.session_state["user"] = result["user"]
-                            st.session_state["token"] = result.get("token", "")
+                            sm.is_authenticated = True
+                            sm.user = result["user"]
+                            sm.token = result.get("token", "")
                             st.success("🎉 Account created successfully!")
                             st.balloons()
                             st.rerun()
@@ -165,6 +177,13 @@ def render_login_page():
         )
         if st.button("🎮 Try Demo Mode", width="stretch"):
             demo_result = auth_service._demo_sign_in("demo@dayscore.app")
+            sm.is_authenticated = True
+            sm.user = demo_result["user"]
+            sm.token = demo_result["token"]
+            st.rerun()
+            
+        if st.button("🩺 Try Counselor Demo", width="stretch"):
+            demo_result = auth_service._demo_sign_in("dr.sharma@dayscore.app")
             sm.is_authenticated = True
             sm.user = demo_result["user"]
             sm.token = demo_result["token"]
@@ -219,8 +238,12 @@ def page_settings():
     from features.settings import render_settings
     render_settings()
 
+def page_counselor_dashboard():
+    from features.counselor_dashboard import render_counselor_dashboard
+    render_counselor_dashboard()
+
 # Define Navigation Pages globally to avoid re-instantiation
-PAGES = [
+PATIENT_PAGES = [
     st.Page(page_dashboard, title="Dashboard", icon="📊", default=True),
     st.Page(page_results, title="Results", icon="📈"),
     st.Page(page_achievements, title="Achievements", icon="🏆"),
@@ -230,6 +253,11 @@ PAGES = [
     st.Page(page_counselor, title="Counselor", icon="🩺"),
     st.Page(page_messages, title="Messages", icon="💬"),
     st.Page(page_wellness, title="Wellness", icon="🧘"),
+    st.Page(page_settings, title="Settings", icon="⚙️"),
+]
+
+COUNSELOR_PAGES = [
+    st.Page(page_counselor_dashboard, title="My Patients", icon="👥", default=True),
     st.Page(page_settings, title="Settings", icon="⚙️"),
 ]
 
@@ -287,7 +315,9 @@ def render_main_app():
     user = sm.user
     
     # Instantiate navigation once per script run
-    pg = st.navigation(PAGES)
+    is_counselor = user.get("role") == "counselor"
+    pages_to_use = COUNSELOR_PAGES if is_counselor else PATIENT_PAGES
+    pg = st.navigation(pages_to_use)
 
     # Render Header (Above Nav)
     render_sidebar_header(user)
@@ -297,12 +327,11 @@ def render_main_app():
         pg.run()
     except Exception as page_err:
         import traceback
-        print("Page Error:", traceback.format_exc())
+        tb = traceback.format_exc()
+        print("Page Error:", tb)  # Always visible in Streamlit Cloud logs
+        st.error(f"🚨 Page error: {page_err}")
         if AppConfig.DEBUG:
-            st.error(f"🚨 Page error: {page_err}")
-            st.code(traceback.format_exc())
-        else:
-            st.error(f"🚨 An unexpected error occurred while loading this page.")
+            st.code(tb)
 
     # Render Footer (Below Nav)
     render_sidebar_footer()

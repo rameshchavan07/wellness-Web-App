@@ -19,7 +19,7 @@ class AuthService:
         self.db = get_firestore_client()
         self.auth = get_firebase_auth()
 
-    def sign_up(self, email: str, password: str, display_name: str) -> dict:
+    def sign_up(self, email: str, password: str, display_name: str, is_counselor: bool = False) -> dict:
         """Register a new user."""
         try:
             if self.auth:
@@ -39,6 +39,7 @@ class AuthService:
                     "total_points": 0,
                     "last_active_date": "",
                     "sleep_streak": 0,
+                    "role": "counselor" if is_counselor else "patient"
                 }
                 # Store in Firestore
                 if self.db:
@@ -92,6 +93,7 @@ class AuthService:
                     "total_points": 0,
                     "last_active_date": "",
                     "sleep_streak": 0,
+                    "role": "patient",
                 }
 
                 # Store / merge in Firestore
@@ -164,6 +166,16 @@ class AuthService:
                         user_data["total_points"] = extra.get("total_points", 0)
                         if "google_fit_credentials" in extra:
                             user_data["google_fit_credentials"] = extra["google_fit_credentials"]
+                        if "role" in extra:
+                            user_data["role"] = extra["role"]
+                
+                # Check for counselor role (legacy predefined counselors)
+                from services.counselor_service import CounselorService
+                counselor = CounselorService.get_counselor_by_email(email)
+                if counselor:
+                    user_data["role"] = "counselor"
+                    user_data["counselor_id"] = counselor["id"]
+
                 return {"success": True, "user": user_data, "token": auth_data.get("idToken", "admin_session")}
             else:
                 return self._demo_sign_in(email)
@@ -201,7 +213,7 @@ class AuthService:
             return False
 
     # ── Demo Mode Helpers ──────────────────────────────
-    def _demo_sign_up(self, email: str, name: str) -> dict:
+    def _demo_sign_up(self, email: str, name: str, is_counselor: bool = False) -> dict:
         """Demo mode registration (no Firebase)."""
         from config.settings import AppConfig
         user_data = {
@@ -212,6 +224,7 @@ class AuthService:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "streak": 0,
             "total_points": 0,
+            "role": "counselor" if is_counselor else "patient"
         }
         return {"success": True, "user": user_data, "token": "demo_token"}
 
@@ -224,6 +237,16 @@ class AuthService:
             "email": email,
             "profile_photo": "",
         }
+
+        # Check for counselor role
+        from services.counselor_service import CounselorService
+        counselor = CounselorService.get_counselor_by_email(email)
+        if counselor:
+            user_data["name"] = counselor["name"]
+            user_data["role"] = "counselor"
+            user_data["counselor_id"] = counselor["id"]
+            user_data["user_id"] = counselor["id"] # Use counselor ID for demo bookings
+
         return {"success": True, "user": user_data, "token": "demo_token"}
 
     def _demo_google_sign_in(self, google_user_info: dict) -> dict:
@@ -234,6 +257,7 @@ class AuthService:
             "email": google_user_info.get("email", ""),
             "profile_photo": google_user_info.get("picture", ""),
             "auth_provider": "google",
+            "role": "patient",
         }
         return {"success": True, "user": user_data, "token": "demo_google_token"}
 

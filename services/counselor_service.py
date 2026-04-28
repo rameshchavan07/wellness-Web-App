@@ -43,6 +43,7 @@ COUNSELOR_PROFILES = [
     {
         "id": "dr_sharma",
         "name": "Dr. Priya Sharma",
+        "email": "dr.sharma@dayscore.app",
         "title": "Clinical Psychologist",
         "specialty": "Anxiety & Stress Management",
         "experience": "12 years",
@@ -58,6 +59,7 @@ COUNSELOR_PROFILES = [
     {
         "id": "dr_patel",
         "name": "Dr. Rohan Patel",
+        "email": "dr.patel@dayscore.app",
         "title": "Psychiatrist",
         "specialty": "Depression & Mood Disorders",
         "experience": "15 years",
@@ -73,6 +75,7 @@ COUNSELOR_PROFILES = [
     {
         "id": "ms_nair",
         "name": "Ananya Nair",
+        "email": "ananya.nair@dayscore.app",
         "title": "Licensed Therapist",
         "specialty": "Relationships & Self-Esteem",
         "experience": "8 years",
@@ -88,6 +91,7 @@ COUNSELOR_PROFILES = [
     {
         "id": "dr_khan",
         "name": "Dr. Ayesha Khan",
+        "email": "dr.khan@dayscore.app",
         "title": "Child & Adolescent Psychologist",
         "specialty": "Youth Mental Health",
         "experience": "10 years",
@@ -103,6 +107,7 @@ COUNSELOR_PROFILES = [
     {
         "id": "mr_das",
         "name": "Siddharth Das",
+        "email": "siddharth.das@dayscore.app",
         "title": "Mindfulness Coach",
         "specialty": "Meditation & Mindfulness",
         "experience": "6 years",
@@ -145,6 +150,14 @@ class CounselorService:
         """Get a specific counselor by ID."""
         for c in COUNSELOR_PROFILES:
             if c["id"] == counselor_id:
+                return c
+        return {}
+
+    @staticmethod
+    def get_counselor_by_email(email: str) -> dict:
+        """Get a specific counselor by email."""
+        for c in COUNSELOR_PROFILES:
+            if c.get("email", "").lower() == email.lower():
                 return c
         return {}
 
@@ -253,6 +266,25 @@ Thank you for prioritizing your mental health with DayScore.
             return st.session_state.get("demo_bookings", [])
         except Exception:
             return st.session_state.get("demo_bookings", [])
+
+    def get_counselor_bookings(self, counselor_id: str) -> list:
+        """Get all bookings for a counselor."""
+        try:
+            if self.db:
+                docs = (
+                    self.db.collection("counselor_bookings")
+                    .where(filter=FieldFilter("counselor_id", "==", counselor_id))
+                    .get()
+                )
+                bookings = [doc.to_dict() for doc in docs]
+                bookings.sort(key=lambda x: x.get("session_date", ""), reverse=True)
+                return bookings
+            
+            # For demo
+            demo_bookings = st.session_state.get("demo_bookings", [])
+            return [b for b in demo_bookings if b.get("counselor_id") == counselor_id]
+        except Exception:
+            return []
 
     # ── AI Counselor Chat ──────────────────────────────
 

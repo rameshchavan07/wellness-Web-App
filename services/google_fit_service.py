@@ -34,41 +34,50 @@ def _cached_fetch_daily_stats(token: str, refresh_token: str, client_id: str, cl
     end_ms = int(end.timestamp() * 1000)
 
     # Scopes/Buckets
-    def _get_int(dataTypeName):
+    def _get_int(dataTypeName, dataSourceId=None):
         try:
+            agg = {"dataTypeName": dataTypeName}
+            if dataSourceId:
+                agg["dataSourceId"] = dataSourceId
             body = {
-                "aggregateBy": [{"dataTypeName": dataTypeName}],
+                "aggregateBy": [agg],
                 "bucketByTime": {"durationMillis": 86400000},
                 "startTimeMillis": start_ms,
                 "endTimeMillis": end_ms,
             }
             resp = service.users().dataset().aggregate(userId="me", body=body).execute()
+            total = 0
             for bucket in resp.get("bucket", []):
                 for ds in bucket.get("dataset", []):
                     for point in ds.get("point", []):
                         for val in point.get("value", []):
-                            return val.get("intVal", 0)
-        except Exception:
-            pass
+                            total += val.get("intVal", 0)
+            return total
+        except Exception as e:
+            print(f"Error fetching {dataTypeName}: {e}")
         return 0
 
-    def _get_float(dataTypeName):
+    def _get_float(dataTypeName, dataSourceId=None):
         try:
+            agg = {"dataTypeName": dataTypeName}
+            if dataSourceId:
+                agg["dataSourceId"] = dataSourceId
             body = {
-                "aggregateBy": [{"dataTypeName": dataTypeName}],
+                "aggregateBy": [agg],
                 "bucketByTime": {"durationMillis": 86400000},
                 "startTimeMillis": start_ms,
                 "endTimeMillis": end_ms,
             }
             resp = service.users().dataset().aggregate(userId="me", body=body).execute()
+            total = 0.0
             for bucket in resp.get("bucket", []):
                 for ds in bucket.get("dataset", []):
                     for point in ds.get("point", []):
                         for val in point.get("value", []):
-                            fp = val.get("fpVal", 0.0)
-                            return int(round(fp))
-        except Exception:
-            pass
+                            total += val.get("fpVal", 0.0)
+            return int(round(total))
+        except Exception as e:
+            print(f"Error fetching {dataTypeName}: {e}")
         return 0
 
     def _get_sleep():
@@ -93,14 +102,13 @@ def _cached_fetch_daily_stats(token: str, refresh_token: str, client_id: str, cl
         return 0.0
 
     with ThreadPoolExecutor(max_workers=4) as executor:
-        f_steps = executor.submit(_get_int, "com.google.step_count.delta")
+        f_steps = executor.submit(_get_int, "com.google.step_count.delta", "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps")
         f_calories = executor.submit(_get_float, "com.google.calories.expended")
-        f_sleep = executor.submit(_get_sleep)
         f_heart = executor.submit(_get_float, "com.google.heart_rate.bpm")
         
         steps = f_steps.result()
         calories = f_calories.result()
-        sleep = f_sleep.result()
+        sleep = 0.0  # Temporarily disabled due to missing scope
         heart_rate = f_heart.result()
 
     return {
